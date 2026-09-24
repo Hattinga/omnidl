@@ -2,17 +2,29 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
 
 jobs:
   test:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Tests
         run: cargo test --locked
+      # Downloads yt-dlp, ffmpeg and Deno for this system and starts them;
+      # also checks every download link of every platform.
+      - name: Tool downloads
+        run: cargo test --locked --lib deps::tests -- --ignored
       - name: Build
         run: cargo build --release --locked
+      # The server build must not need any window or desktop libraries.
+      - name: Headless build
+        if: runner.os == 'Linux'
+        run: cargo build --release --locked --no-default-features --features cli --bin omnidl-cli
