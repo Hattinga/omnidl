@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
+PackageIdentifier: Hattinga.omnidl
+PackageVersion: 0.2.0
+PackageLocale: de-DE
+Publisher: Jonas Hattinger
+PublisherUrl: https://github.com/Hattinga
+PackageName: omnidl
+PackageUrl: https://github.com/Hattinga/omnidl
+License: MIT
+LicenseUrl: https://github.com/Hattinga/omnidl/blob/main/LICENSE
+ShortDescription: Desktop-Downloader fÃ¼r YouTube, TikTok, Spotify und rund 1800 weitere Seiten.
+Description: Link einfÃ¼gen, Format wÃ¤hlen, fertig. Mit Warteschlange, die Neustarts Ã¼bersteht, geplanten Downloads, Browser-Erweiterung und automatischen Updates.
+Tags:
+- downloader
+- youtube
+- yt-dlp
+- mp3
+- video
+ReleaseNotesUrl: https://github.com/Hattinga/omnidl/releases/tag/v0.2.0
+ManifestType: defaultLocale
+ManifestVersion: 1.9.0
