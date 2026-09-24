@@ -1,1 +1,158 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1c1e" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="omnidl">
+<meta name="referrer" content="no-referrer">
+<title>omnidl</title>
+<link rel="icon" href="/icon.png">
+<link rel="apple-touch-icon" href="/icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/app.css">
+<script src="/app.js" defer></script>
+</head>
+<body>
+<header class="bar">
+  <div class="brand"><img src="/icon.png" alt="" width="28" height="28"><span>omnidl</span></div>
+  <button class="symbol" id="open-settings" type="button" aria-label="Einstellungen" title="Einstellungen">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path class="gear" d="M19.34 10.05L22.05 10.27L22.05 13.73L19.34 13.95L18.57 15.81L20.33 17.89L17.89 20.33L15.81 18.57L13.95 19.34L13.73 22.05L10.27 22.05L10.05 19.34L8.19 18.57L6.11 20.33L3.67 17.89L5.43 15.81L4.66 13.95L1.95 13.73L1.95 10.27L4.66 10.05L5.43 8.19L3.67 6.11L6.11 3.67L8.19 5.43L10.05 4.66L10.27 1.95L13.73 1.95L13.95 4.66L15.81 5.43L17.89 3.67L20.33 6.11L18.57 8.19Z"/><circle class="gear" cx="12" cy="12" r="3.2"/></svg>
+  </button>
+</header>
 
+<main>
+  <section class="compose" aria-label="Neuer Download">
+    <div class="link-row">
+      <div class="field" id="field">
+        <input id="link" type="text" inputmode="url" enterkeyhint="go" autocomplete="off" autocapitalize="off"
+               autocorrect="off" spellcheck="false" aria-label="Link"
+               placeholder="Link einfügen – YouTube, TikTok, Spotify …">
+        <span class="badge" id="badge" hidden></span>
+        <button class="clear" id="clear" type="button" aria-label="Leeren" title="Leeren" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle class="fill" cx="12" cy="12" r="9"/><path class="cut" d="M9.2 9.2l5.6 5.6M14.8 9.2l-5.6 5.6"/></svg>
+        </button>
+      </div>
+      <button class="primary" id="start" type="button" disabled>Laden</button>
+      <div class="menu-anchor">
+        <button class="symbol" id="later" type="button" aria-haspopup="true" aria-expanded="false"
+                aria-controls="later-menu" aria-label="Später laden" title="Später laden">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle class="line" cx="12" cy="12" r="8.6"/><path class="line" d="M12 7.2V12l3.4 2"/></svg>
+        </button>
+        <div class="menu" id="later-menu" hidden>
+          <div class="menu-caption">Später laden</div>
+          <button class="menu-item" type="button" data-preset="30">In 30 Minuten</button>
+          <button class="menu-item" type="button" data-preset="60">In einer Stunde</button>
+          <button class="menu-item" type="button" data-preset="night">Heute Nacht um 2:00</button>
+          <div class="menu-sep"></div>
+          <div class="menu-caption">Eigene Uhrzeit</div>
+          <div class="menu-time">
+            <input id="later-time" type="time" step="300" aria-label="Uhrzeit">
+            <button class="primary small" id="later-plan" type="button">Planen</button>
+          </div>
+          <div class="menu-note" id="later-note"></div>
+          <div class="menu-note rule" id="later-need">Erst oben einen Link einfügen.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="options">
+      <div class="segmented" id="kind" role="radiogroup" aria-label="Art" data-value="video">
+        <button type="button" role="radio" data-mode="video">Video</button>
+        <button type="button" role="radio" data-mode="audio">Audio</button>
+      </div>
+      <div class="popup narrow"><select id="format" aria-label="Format"></select></div>
+      <div class="popup"><select id="quality" aria-label="Qualität"></select></div>
+      <label class="switch-row" title="Aus: nur das einzelne Video, auch wenn der Link zu einer Playlist gehört">
+        <span>Ganze Playlist</span><input id="playlist" class="switch" type="checkbox" role="switch">
+      </label>
+    </div>
+
+    <div class="banner" id="banner" hidden>
+      <span class="banner-icon" id="banner-icon"></span>
+      <span class="banner-text" id="banner-text"></span>
+      <button class="text-button" id="banner-action" type="button" hidden></button>
+      <button class="symbol small" id="banner-dismiss" type="button" aria-label="Ausblenden" title="Ausblenden" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle class="fill" cx="12" cy="12" r="8"/><path class="cut" d="M9.5 9.5l5 5M14.5 9.5l-5 5"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <section class="downloads" aria-labelledby="downloads-title">
+    <div class="list-head">
+      <h2 id="downloads-title">Downloads</h2>
+      <span class="counts" id="counts"></span>
+      <span class="spacer"></span>
+      <button class="text-button red" id="cancel-all" type="button" hidden>Alle stoppen</button>
+      <button class="text-button" id="clear-list" type="button" hidden>Liste leeren</button>
+    </div>
+    <div class="list" id="list" hidden></div>
+    <div class="empty" id="empty" hidden>
+      <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21"/><path d="M24 13.5v19M16.5 25.5L24 33l7.5-7.5"/></svg>
+      <div class="empty-title">Keine Downloads</div>
+      <div class="empty-text">Link oben einfügen und Enter drücken.</div>
+      <div class="empty-sources">YouTube · TikTok · Spotify · Instagram · SoundCloud · rund 1800 weitere Seiten</div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <button class="folder" id="folder" type="button" title="Speicherort ändern">
+    <svg viewBox="0 0 20 16" aria-hidden="true"><path class="tab" d="M1 3a2 2 0 0 1 2-2h4.2l2 2H17a2 2 0 0 1 2 2v1H1z"/><rect class="body" x="1" y="4.5" width="18" height="10.5" rx="2"/></svg>
+    <span id="dir"></span>
+  </button>
+  <span class="version" id="ytdlp"></span>
+</footer>
+
+<dialog id="settings" aria-labelledby="settings-title">
+  <form method="dialog" class="sheet">
+    <header class="sheet-head"><h2 id="settings-title">Einstellungen</h2></header>
+    <div class="sheet-body">
+      <h3 class="section-title">Downloads</h3>
+      <div class="group">
+        <div class="form-row stacked">
+          <label for="dir-input">Speicherort</label>
+          <input id="dir-input" type="text" spellcheck="false" autocomplete="off" autocapitalize="off">
+        </div>
+        <div class="form-row">
+          <span>Gleichzeitige Downloads</span>
+          <span class="value" id="parallel"></span>
+          <span class="stepper">
+            <button type="button" data-step="-1" aria-label="Weniger">−</button><button type="button" data-step="1" aria-label="Mehr">+</button>
+          </span>
+        </div>
+      </div>
+      <p class="section-note" id="dir-note"></p>
+
+      <h3 class="section-title">Anmeldung bei Seiten</h3>
+      <div class="group">
+        <div class="form-row">
+          <label for="cookies">Cookies aus Browser</label>
+          <div class="popup"><select id="cookies"></select></div>
+        </div>
+      </div>
+      <p class="section-note">Für private oder altersbeschränkte Inhalte. Gemeint ist ein Browser auf dem Server; unter Windows klappt Firefox am zuverlässigsten.</p>
+
+      <h3 class="section-title">Werkzeuge</h3>
+      <div class="group" id="tools"></div>
+      <p class="section-note" id="tools-note"></p>
+
+      <h3 class="section-title">Server</h3>
+      <div class="group">
+        <div class="form-row"><span>omnidl</span><span class="value" id="version"></span></div>
+        <div class="form-row" id="logout-row" hidden>
+          <span>Angemeldet in diesem Browser</span>
+          <button class="text-button red" id="logout" type="button">Abmelden</button>
+        </div>
+      </div>
+    </div>
+    <footer class="sheet-foot"><button class="primary" value="done">Fertig</button></footer>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

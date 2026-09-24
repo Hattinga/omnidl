@@ -10,3 +10,6 @@ queue.json.tmp
 /omnidl.exe.old
 /omnidl.exe.new
 /notes.md
+web.toml
+queue-web.json
+queue-web.json.tmp
