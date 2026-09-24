@@ -12,6 +12,7 @@ mod job;
 mod journal;
 mod launch;
 mod matcher;
+mod peek;
 mod schedule;
 mod spotify;
 mod sys;

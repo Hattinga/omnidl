@@ -5,7 +5,7 @@ use crate::detect::{self, Source, SpotifyKind};
 use crate::job::{Event, JobId, JobState, JobUpdate};
 use crate::journal::{Entry, Journal};
 use crate::launch::Launch;
-use crate::{gallery, matcher, schedule, spotify, tagger, update, util, ytdlp};
+use crate::{gallery, matcher, peek, schedule, spotify, tagger, update, util, ytdlp};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -53,6 +53,8 @@ pub struct Shared {
     /// yt-dlp and ffmpeg are in place; jobs wait for this.
     ready: watch::Sender<bool>,
     cfg: Arc<Mutex<Config>>,
+    /// Look titles up before the download starts (off in tests: no network).
+    peek_titles: bool,
 }
 
 impl Shared {
@@ -76,6 +78,7 @@ impl Shared {
             journal: Arc::new(journal),
             ready: watch::Sender::new(false),
             cfg: Arc::new(Mutex::new(cfg)),
+            peek_titles: true,
         }
     }
 
@@ -334,6 +337,16 @@ fn submit(shared: &Shared, entry: Entry) {
     let source = detect::detect(&entry.url).label();
     let (id, token) = shared.new_job(None, entry.url.clone(), entry.url.clone(), source);
     shared.journal.insert(id, entry.clone());
+    // Scheduled and waiting jobs show the real name, not the bare link.
+    if shared.peek_titles && peek::endpoint(&entry.url).is_some() {
+        let s = shared.clone();
+        let url = entry.url.clone();
+        tokio::spawn(async move {
+            if let Some(title) = peek::title(&url).await {
+                s.emit(id, JobUpdate::Title(title));
+            }
+        });
+    }
     let s = shared.clone();
     tokio::spawn(async move { run(s, id, token, entry).await });
 }
@@ -807,7 +820,8 @@ mod tests {
         let (tx, rx) = std::sync::mpsc::channel();
         let cfg = Config { download_dir: dir, parallel: 4, ..Config::default() };
         let tools = Tools::new(Path::new(env!("CARGO_MANIFEST_DIR")));
-        let shared = Shared::new(tx, egui::Context::default(), tools, Journal::in_memory(), cfg.clone());
+        let mut shared = Shared::new(tx, egui::Context::default(), tools, Journal::in_memory(), cfg.clone());
+        shared.peek_titles = false;
         (shared, rx, cfg)
     }
 
