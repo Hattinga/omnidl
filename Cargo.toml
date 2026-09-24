@@ -65,6 +65,43 @@ windows-sys = { version = "0.61.2", features = [
 [build-dependencies]
 embed-resource = "3.0.11"
 
+# Debian packages, built by packaging/linux/package.sh (cargo deb --no-build):
+# `omnidl` is the desktop app, the `cli` variant the terminal program with the
+# web interface as a systemd service.
+[package.metadata.deb]
+name = "omnidl"
+maintainer = "Jonas Hattinger <Hattinga@users.noreply.github.com>"
+copyright = "2026, Jonas Hattinger"
+section = "video"
+priority = "optional"
+revision = ""
+depends = "$auto, ca-certificates"
+extended-description = """\
+Link einfügen, Format wählen, fertig: YouTube, TikTok, Spotify, Instagram, \
+SoundCloud und die übrigen Seiten, die yt-dlp kennt. Lädt seine Werkzeuge \
+(yt-dlp, ffmpeg, Deno, gallery-dl) beim ersten Start selbst."""
+assets = [
+    ["target/release/omnidl", "usr/bin/", "755"],
+    ["packaging/linux/omnidl.desktop", "usr/share/applications/", "644"],
+    ["assets/icon-512.png", "usr/share/icons/hicolor/512x512/apps/omnidl.png", "644"],
+    ["README.md", "usr/share/doc/omnidl/", "644"],
+]
+
+[package.metadata.deb.variants.cli]
+name = "omnidl-cli"
+extended-description = """\
+omnidl ohne Fenster: Downloads im Terminal (omnidl-cli get) und ein \
+Web-Interface für Server und NAS (omnidl-cli serve). Bringt den \
+systemd-Dienst omnidl-web mit, der als Benutzer omnidl läuft und in \
+/var/lib/omnidl speichert; er wird nicht automatisch gestartet."""
+maintainer-scripts = "packaging/linux/deb/"
+assets = [
+    ["target/release/omnidl-cli", "usr/bin/", "755"],
+    ["packaging/linux/omnidl-web.service", "usr/lib/systemd/system/", "644"],
+    ["packaging/linux/omnidl-web.default", "etc/default/omnidl-web", "600"],
+    ["README.md", "usr/share/doc/omnidl-cli/", "644"],
+]
+
 [profile.release]
 opt-level = 3
 lto = "fat"

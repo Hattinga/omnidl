@@ -1,0 +1,13 @@
+# Only what the build needs; release programs for the "prebuilt" stage stay.
+.git/
+.github/
+.claude/
+target/
+dist/*
+!dist/docker/
+bin/
+browser-extension/
+config.toml
+queue.json
+*.msi
+*.exe
