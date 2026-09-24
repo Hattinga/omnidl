@@ -280,8 +280,40 @@ pub async fn install(rel: &Release, exe: &Path, mut progress: impl FnMut(Option<
     if let Some((cli_exe, _)) = &cli {
         swap(cli_exe, &new_path(cli_exe)).context("omnidl-cli konnte nicht ersetzt werden")?;
     }
+    // Unix keeps a running program's data until it exits, so the old copy can
+    // go right away; inside a macOS app bundle it would break the signature.
+    if cfg!(unix) {
+        cleanup(exe);
+    }
+    refresh_bundle(exe, &rel.version).await;
     Ok(())
 }
+
+/// `…/omnidl.app` when `exe` is the program inside a macOS app bundle.
+pub fn app_bundle(exe: &Path) -> Option<&Path> {
+    let macos = exe.parent()?;
+    let contents = macos.parent()?;
+    let bundle = contents.parent()?;
+    (macos.file_name()? == "MacOS" && contents.file_name()? == "Contents" && bundle.extension()? == "app")
+        .then_some(bundle)
+}
+
+/// After the program inside `omnidl.app` was replaced: the version Finder
+/// shows, and a fresh ad-hoc signature over the bundle. Both tools ship with
+/// macOS; if either fails, the app still runs.
+#[cfg(target_os = "macos")]
+async fn refresh_bundle(exe: &Path, version: &str) {
+    use tokio::process::Command;
+    let Some(bundle) = app_bundle(exe) else { return };
+    let plist = bundle.join("Contents").join("Info.plist");
+    for key in ["CFBundleShortVersionString", "CFBundleVersion"] {
+        let _ = Command::new("/usr/bin/plutil").args(["-replace", key, "-string", version]).arg(&plist).status().await;
+    }
+    let _ = Command::new("/usr/bin/codesign").args(["--force", "--sign", "-"]).arg(bundle).status().await;
+}
+
+#[cfg(not(target_os = "macos"))]
+async fn refresh_bundle(_exe: &Path, _version: &str) {}
 
 /// Downloads `asset` to `dest` and checks checksum and file type; a bad file
 /// is deleted again.
@@ -540,6 +572,15 @@ mod tests {
         assert_eq!(old_path(Path::new("dir/omnidl.exe")), Path::new("dir/omnidl.exe.old"));
         assert_eq!(new_path(Path::new("dir/omnidl")), Path::new("dir/omnidl.new"));
         assert_eq!(old_path(Path::new("dir/omnidl-cli")), Path::new("dir/omnidl-cli.old"));
+    }
+
+    #[test]
+    fn finds_the_app_bundle_around_the_program() {
+        let exe = Path::new("/Applications/omnidl.app/Contents/MacOS/omnidl");
+        assert_eq!(app_bundle(exe), Some(Path::new("/Applications/omnidl.app")));
+        assert_eq!(app_bundle(Path::new("/Users/a/bin/omnidl")), None);
+        assert_eq!(app_bundle(Path::new("/x/omnidl/Contents/MacOS/omnidl")), None, "kein .app");
+        assert_eq!(app_bundle(Path::new("omnidl")), None);
     }
 
     #[test]
