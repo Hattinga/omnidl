@@ -114,11 +114,12 @@ async fn serve(args: Args) -> Result<()> {
     println!("Beende … Unfertige Downloads laufen beim nächsten Start weiter.");
     shutdown.cancel();
     // Running file downloads get a moment; the queue is safe in queue-web.json either way.
-    let _ = tokio::time::timeout(Duration::from_secs(5), server).await;
+    let _ = tokio::time::timeout(Duration::from_secs(3), server).await;
     Ok(())
 }
 
-/// Ctrl+C everywhere, SIGTERM on Unix (`docker stop`, systemd).
+/// Ctrl+C everywhere; SIGTERM on Unix (`docker stop`, systemd); Ctrl+Break,
+/// a closed console and system shutdown on Windows (service wrappers).
 async fn stop_signal() {
     #[cfg(unix)]
     {
@@ -127,6 +128,19 @@ async fn stop_signal() {
             tokio::select! {
                 _ = tokio::signal::ctrl_c() => {}
                 _ = term.recv() => {}
+            }
+            return;
+        }
+    }
+    #[cfg(windows)]
+    {
+        use tokio::signal::windows::{ctrl_break, ctrl_close, ctrl_shutdown};
+        if let (Ok(mut brk), Ok(mut close), Ok(mut down)) = (ctrl_break(), ctrl_close(), ctrl_shutdown()) {
+            tokio::select! {
+                _ = tokio::signal::ctrl_c() => {}
+                _ = brk.recv() => {}
+                _ = close.recv() => {}
+                _ = down.recv() => {}
             }
             return;
         }
