@@ -26,7 +26,8 @@ FROM debian:${DEBIAN}-slim AS runtime
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates libssl3 \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --system --uid 10001 --user-group --home-dir /data --no-create-home \
+    && groupadd --system --gid 10001 omnidl \
+    && useradd --system --uid 10001 --gid omnidl --home-dir /data --no-create-home \
         --shell /usr/sbin/nologin omnidl \
     && mkdir -p /data /downloads \
     && chown omnidl:omnidl /data /downloads
