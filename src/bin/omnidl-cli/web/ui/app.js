@@ -40,7 +40,7 @@ async function api(method, path, body) {
     throw new Error('Server nicht erreichbar.');
   }
   if (res.status === 401) {
-    location.href = '/login';
+    location.href = 'login';
     throw new Error('Bitte anmelden.');
   }
   if (!res.ok) {
@@ -59,7 +59,7 @@ async function loadState() {
   loading = true;
   state.pending = [];
   try {
-    const s = await api('GET', '/api/state');
+    const s = await api('GET', 'api/state');
     state.jobs = new Map(s.jobs.map((j) => [j.id, j]));
     state.seq = s.seq;
     state.tools = s.tools;
@@ -85,7 +85,7 @@ async function loadState() {
 let source = null;
 
 function connect() {
-  source = new EventSource('/api/events');
+  source = new EventSource('api/events');
   source.addEventListener('open', () => {
     state.connected = true;
     loadState();
@@ -184,7 +184,7 @@ async function startDownload(startAt) {
   if (startAt) body.start_at = startAt;
   $('start').disabled = true;
   try {
-    await api('POST', '/api/add', body);
+    await api('POST', 'api/add', body);
     $('link').value = '';
     linkChanged();
     if (startAt) toast(`Geplant: startet ${describe(startAt)}.`);
@@ -314,7 +314,7 @@ async function change(patch) {
   }
   settingsChanged();
   try {
-    const v = await api('PUT', '/api/settings', patch);
+    const v = await api('PUT', 'api/settings', patch);
     state.settings = v.settings;
     state.dirLocked = v.dir_locked;
     settingsChanged();
@@ -332,7 +332,7 @@ async function changeDir() {
   if (state.dirLocked || !state.settings || value === state.settings.download_dir) return;
   const note = $('dir-note');
   try {
-    const v = await api('PUT', '/api/settings', { download_dir: value });
+    const v = await api('PUT', 'api/settings', { download_dir: value });
     note.classList.remove('error');
     state.settings = v.settings;
     settingsChanged();
@@ -469,7 +469,7 @@ function actionButton(act, label) {
 function saveLink(job) {
   const a = document.createElement('a');
   a.className = 'save';
-  a.href = `/api/jobs/${Number(job.id)}/file`;
+  a.href = `api/jobs/${Number(job.id)}/file`;
   a.setAttribute('download', '');
   const zip = job.download !== 'file';
   a.title = zip ? 'Als ZIP auf dieses Gerät laden' : 'Auf dieses Gerät laden';
@@ -689,13 +689,13 @@ function openLater(open) {
 // ---------------------------------------------------------------- actions
 
 async function updateTools() {
-  try { await api('POST', '/api/tools/update'); } catch (e) { toast(e.message); }
+  try { await api('POST', 'api/tools/update'); } catch (e) { toast(e.message); }
 }
 
 async function act(action, id) {
   const path = { stop: 'cancel', now: 'start-now', retry: 'retry' }[action];
   if (!path) return;
-  try { await api('POST', `/api/jobs/${id}/${path}`); } catch (e) { toast(e.message); }
+  try { await api('POST', `api/jobs/${id}/${path}`); } catch (e) { toast(e.message); }
 }
 
 let toastTimer = 0;
@@ -774,8 +774,8 @@ function wire() {
     }
   });
 
-  $('cancel-all').addEventListener('click', () => api('POST', '/api/cancel-all').catch((e) => toast(e.message)));
-  $('clear-list').addEventListener('click', () => api('POST', '/api/clear').catch((e) => toast(e.message)));
+  $('cancel-all').addEventListener('click', () => api('POST', 'api/cancel-all').catch((e) => toast(e.message)));
+  $('clear-list').addEventListener('click', () => api('POST', 'api/clear').catch((e) => toast(e.message)));
 
   $('banner-action').addEventListener('click', () => { if (bannerAction) bannerAction(); });
   $('banner-dismiss').addEventListener('click', () => {
@@ -799,8 +799,8 @@ function wire() {
   }
   $('cookies').addEventListener('change', (e) => change({ cookies: e.target.value }));
   $('logout').addEventListener('click', async () => {
-    try { await api('POST', '/api/logout'); } catch { /* going anyway */ }
-    location.href = '/login';
+    try { await api('POST', 'api/logout'); } catch { /* going anyway */ }
+    location.href = 'login';
   });
 
   window.addEventListener('resize', render);
@@ -818,7 +818,7 @@ function init() {
   const shared = [q.get('url'), q.get('text')].filter(Boolean).join(' ');
   if (shared) {
     $('link').value = splitUrls(shared).join(' ');
-    history.replaceState(null, '', '/');
+    history.replaceState(null, '', location.pathname);
   }
   linkChanged();
   if (matchMedia('(pointer: fine)').matches) $('link').focus();

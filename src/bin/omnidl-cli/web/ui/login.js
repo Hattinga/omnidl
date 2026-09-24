@@ -15,14 +15,14 @@ form.addEventListener('submit', async (e) => {
   error.textContent = '';
   let message = 'Server nicht erreichbar.';
   try {
-    const res = await fetch('/api/login', {
+    const res = await fetch('api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Omnidl': '1' },
       credentials: 'same-origin',
       body: JSON.stringify({ password: input.value }),
     });
     if (res.ok) {
-      location.replace('/');
+      location.replace('./');
       return;
     }
     try { message = (await res.json()).error || message; } catch { message = `Fehler ${res.status}`; }

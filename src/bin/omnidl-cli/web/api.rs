@@ -125,10 +125,11 @@ fn refuse(app: &App, req: &Request) -> Option<Response> {
     if PUBLIC.contains(&path) || app.auth.allows(h) {
         return None;
     }
-    Some(if path.starts_with("/api/") {
-        error(StatusCode::UNAUTHORIZED, "Bitte anmelden.")
+    // Relative, so the page also works behind a proxy under a sub-path.
+    Some(if path == "/" {
+        Redirect::to("login").into_response()
     } else {
-        Redirect::to("/login").into_response()
+        error(StatusCode::UNAUTHORIZED, "Bitte anmelden.")
     })
 }
 
@@ -175,7 +176,7 @@ fn asset(body: impl Into<axum::body::Body>, content_type: &'static str) -> Respo
 
 async fn login_page(State(app): State<Arc<App>>, headers: HeaderMap) -> Response {
     if app.auth.allows(&headers) {
-        return Redirect::to("/").into_response();
+        return Redirect::to("./").into_response();
     }
     asset(LOGIN_HTML, "text/html; charset=utf-8")
 }
@@ -570,8 +571,9 @@ mod tests {
         assert_eq!(t.get("/api/state", None).await.status(), StatusCode::UNAUTHORIZED);
         let page = t.get("/", None).await;
         assert_eq!(page.status(), StatusCode::SEE_OTHER);
-        assert_eq!(page.headers()[header::LOCATION], "/login");
-        assert_eq!(t.get("/app.js", None).await.status(), StatusCode::SEE_OTHER);
+        assert_eq!(page.headers()[header::LOCATION], "login");
+        assert_eq!(t.get("/app.js", None).await.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(t.get("/icon.png", None).await.status(), StatusCode::OK);
         assert_eq!(t.get("/api/jobs/1/file", None).await.status(), StatusCode::UNAUTHORIZED);
         assert_eq!(t.get("/login", None).await.status(), StatusCode::OK);
         assert_eq!(t.get("/app.css", None).await.status(), StatusCode::OK);

@@ -3,14 +3,14 @@
   "short_name": "omnidl",
   "description": "Downloads von YouTube, TikTok, Spotify und rund 1800 weiteren Seiten",
   "lang": "de",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#f2f2f7",
   "theme_color": "#f2f2f7",
-  "icons": [{ "src": "/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }],
+  "icons": [{ "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }],
   "share_target": {
-    "action": "/",
+    "action": "./",
     "method": "GET",
     "params": { "title": "title", "text": "text", "url": "url" }
   }
