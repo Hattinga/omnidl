@@ -121,7 +121,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Built on 22.04 so the programs also run on older systems (glibc 2.35, OpenSSL 3).
+          # Built on 22.04 so the programs also run on older systems (glibc 2.35).
           - arch: x86_64
             runner: ubuntu-22.04
           - arch: aarch64
@@ -163,7 +163,7 @@ jobs:
           sudo apt-get install -y ./dist/omnidl-cli_*.deb
           omnidl-cli --version
           getent passwd omnidl
-          ls -ld /var/lib/omnidl /var/lib/omnidl/downloads
+          sudo ls -ld /var/lib/omnidl /var/lib/omnidl/downloads
           sudo ls -l /etc/default/omnidl-web
           systemd-analyze verify omnidl-web.service
           sudo systemctl start omnidl-web

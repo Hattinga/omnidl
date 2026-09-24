@@ -82,8 +82,8 @@ curl -fsSL https://github.com/Hattinga/omnidl/releases/latest/download/install.s
 ```
 
 Oder `omnidl-<version>-linux-x86_64.tar.gz` entpacken und `./omnidl` starten (README.txt im
-Archiv). Daten liegen unter `~/.local/share/omnidl`. Braucht glibc 2.35 und OpenSSL 3
-(Ubuntu 22.04, Debian 12, Fedora 36 oder neuer).
+Archiv). Daten liegen unter `~/.local/share/omnidl`. Braucht glibc 2.35 oder neuer
+(Ubuntu 22.04, Debian 12, Fedora 36 und alles danach).
 
 ## Ubuntu Server / Debian (Web-Interface als Dienst)
 
