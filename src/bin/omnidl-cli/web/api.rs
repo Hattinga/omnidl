@@ -55,10 +55,18 @@ pub struct App {
 }
 
 impl App {
-    fn send(&self, c: Command) -> Result<(), Response> {
-        self.cmd
-            .send(c)
-            .map_err(|_| error(StatusCode::SERVICE_UNAVAILABLE, "Der Download-Dienst läuft nicht mehr."))
+    /// Hands a command to the engine; `false` if it is no longer running.
+    fn send(&self, c: Command) -> bool {
+        self.cmd.send(c).is_ok()
+    }
+}
+
+/// 204 if the engine took the command, 503 if it is gone.
+fn sent(ok: bool) -> Response {
+    if ok {
+        StatusCode::NO_CONTENT.into_response()
+    } else {
+        error(StatusCode::SERVICE_UNAVAILABLE, "Der Download-Dienst läuft nicht mehr.")
     }
 }
 
@@ -322,10 +330,10 @@ async fn add(State(app): State<Arc<App>>, body: Result<Json<AddReq>, JsonRejecti
     cfg.playlist = req.playlist.unwrap_or(cfg.playlist);
 
     let added = urls.len();
-    match app.send(Command::Add { urls, cfg, start_at }) {
-        Ok(()) => Json(json!({ "added": added })).into_response(),
-        Err(r) => r,
+    if !app.send(Command::Add { urls, cfg, start_at }) {
+        return sent(false);
     }
+    Json(json!({ "added": added })).into_response()
 }
 
 /// Sends a command for a job the list knows.
@@ -333,10 +341,7 @@ fn job_command(app: &App, id: JobId, c: Command) -> Response {
     if app.hub.with(|m| m.jobs.get(id).is_none()) {
         return error(StatusCode::NOT_FOUND, "Unbekannter Download.");
     }
-    match app.send(c) {
-        Ok(()) => StatusCode::NO_CONTENT.into_response(),
-        Err(r) => r,
-    }
+    sent(app.send(c))
 }
 
 async fn cancel(State(app): State<Arc<App>>, Path(id): Path<JobId>) -> Response {
@@ -363,18 +368,12 @@ async fn retry(State(app): State<Arc<App>>, Path(id): Path<JobId>) -> Response {
     match found {
         None => error(StatusCode::NOT_FOUND, "Unbekannter Download."),
         Some(Err(())) => error(StatusCode::CONFLICT, "Dieser Download lässt sich nicht erneut versuchen."),
-        Some(Ok((url, cfg))) => match app.send(Command::Add { urls: vec![url], cfg, start_at: None }) {
-            Ok(()) => StatusCode::NO_CONTENT.into_response(),
-            Err(r) => r,
-        },
+        Some(Ok((url, cfg))) => sent(app.send(Command::Add { urls: vec![url], cfg, start_at: None })),
     }
 }
 
 async fn cancel_all(State(app): State<Arc<App>>) -> Response {
-    match app.send(Command::CancelAll) {
-        Ok(()) => StatusCode::NO_CONTENT.into_response(),
-        Err(r) => r,
-    }
+    sent(app.send(Command::CancelAll))
 }
 
 /// Removes finished entries for every open page.
@@ -469,9 +468,9 @@ async fn put_settings(State(app): State<Arc<App>>, body: Result<Json<Patch>, Jso
     if app.save_config {
         save(&cfg, app.stored_dir.as_ref());
     }
-    let _ = app.send(Command::SetConfig(cfg));
+    app.send(Command::SetConfig(cfg));
     if let Some(n) = parallel {
-        let _ = app.send(Command::SetParallel(n));
+        app.send(Command::SetParallel(n));
     }
     Json(view).into_response()
 }
@@ -486,10 +485,7 @@ fn save(cfg: &Config, stored_dir: Option<&PathBuf>) {
 }
 
 async fn update_tools(State(app): State<Arc<App>>) -> Response {
-    match app.send(Command::UpdateTools) {
-        Ok(()) => StatusCode::NO_CONTENT.into_response(),
-        Err(r) => r,
-    }
+    sent(app.send(Command::UpdateTools))
 }
 
 #[cfg(test)]
