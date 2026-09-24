@@ -318,12 +318,8 @@ pub async fn ensure(tools: &Tools, force_ytdlp: bool, mut progress: impl FnMut(S
                 let _ = tokio::fs::remove_file(&archive).await;
             }
             Ffmpeg::Pair { ffmpeg, ffprobe } => {
-                for (url, name) in [(ffmpeg, "ffmpeg"), (ffprobe, "ffprobe")] {
-                    let zip = tools.bin.join(format!("{name}.zip"));
-                    fetch(url, &zip, name, &mut progress).await?;
-                    unzip(&zip, &tools.bin, Some(vec![exe(name)])).await?;
-                    let _ = tokio::fs::remove_file(&zip).await;
-                }
+                install_from_zip(tools, ffmpeg, "ffmpeg", &mut progress).await?;
+                install_from_zip(tools, ffprobe, "ffprobe", &mut progress).await?;
             }
         }
     }
@@ -331,10 +327,7 @@ pub async fn ensure(tools: &Tools, force_ytdlp: bool, mut progress: impl FnMut(S
     // Without a JavaScript runtime only YouTube suffers; the app warns about it.
     if let Some(url) = &sources.deno {
         if !tools.deno().is_file() && find_program("node").is_none() {
-            let zip = tools.bin.join("deno.zip");
-            fetch(url, &zip, "deno", &mut progress).await?;
-            unzip(&zip, &tools.bin, Some(vec![exe("deno")])).await?;
-            let _ = tokio::fs::remove_file(&zip).await;
+            install_from_zip(tools, url, "deno", &mut progress).await?;
         }
     }
 
@@ -346,6 +339,15 @@ pub async fn ensure(tools: &Tools, force_ytdlp: bool, mut progress: impl FnMut(S
             make_executable(&dest)?;
         }
     }
+    Ok(())
+}
+
+/// Downloads a zip and takes the program `name` out of it into `bin/`.
+async fn install_from_zip(tools: &Tools, url: &str, name: &str, progress: &mut impl FnMut(String)) -> Result<()> {
+    let zip = tools.bin.join(format!("{name}.zip"));
+    fetch(url, &zip, name, progress).await?;
+    unzip(&zip, &tools.bin, Some(vec![exe(name)])).await?;
+    let _ = tokio::fs::remove_file(&zip).await;
     Ok(())
 }
 
@@ -730,8 +732,11 @@ mod tests {
         }
         urls.sort();
         urls.dedup();
+        // Own client: pooled connections of the shared one would die with this
+        // test's runtime and break tests running beside it.
+        let http = reqwest::Client::builder().user_agent(util::USER_AGENT).build().unwrap();
         for url in urls {
-            let resp = util::http().get(&url).header("Range", "bytes=0-0").send().await;
+            let resp = http.get(&url).header("Range", "bytes=0-0").send().await;
             let status = resp.map(|r| r.status());
             assert!(status.as_ref().is_ok_and(|s| s.is_success()), "{url}: {status:?}");
         }
@@ -760,8 +765,13 @@ mod tests {
         assert!(String::from_utf8_lossy(&out.stdout).starts_with("ffmpeg version"));
         let out = util::command(&tools.ffprobe()).arg("-version").output().await.expect("ffprobe startet");
         assert!(out.status.success());
-        if tools.deno().starts_with(&tools.bin) {
-            let out = util::command(&tools.deno()).arg("--version").output().await.expect("deno startet");
+        // Where Node is installed (CI runners) ensure skips Deno; load it anyway.
+        if let Some(url) = &Sources::current().deno {
+            let deno = tools.bin.join(exe("deno"));
+            if !deno.is_file() {
+                install_from_zip(&tools, url, "deno", &mut |_| {}).await.expect("Deno geladen");
+            }
+            let out = util::command(&deno).arg("--version").output().await.expect("deno startet");
             assert!(String::from_utf8_lossy(&out.stdout).starts_with("deno "));
         }
         if Sources::current().gallery.is_some() {
