@@ -40,7 +40,8 @@ futures-util = "0.3.34"
 getrandom = { version = "0.4.3", optional = true }
 lofty = "0.25.4"
 regex = "1.13.1"
-reqwest = { version = "0.13.5", default-features = false, features = ["http2", "json", "native-tls", "stream"] }
+# TLS backend per platform, see the target sections below.
+reqwest = { version = "0.13.5", default-features = false, features = ["http2", "json", "stream"] }
 rfd = { version = "0.17.2", optional = true }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
@@ -61,6 +62,29 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_System_Registry",
     "Win32_System_Threading",
 ] }
+
+# The system TLS stacks on Windows (SChannel) and macOS (Security.framework).
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+reqwest = { version = "0.13.5", default-features = false, features = ["native-tls"] }
+
+# Elsewhere rustls, so Linux builds need no OpenSSL.
+[target.'cfg(not(any(windows, target_os = "macos")))'.dependencies]
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.189"
+
+# X11 and Wayland windows. rfd's default backend there is already the XDG
+# portal (no GTK).
+[target.'cfg(target_os = "linux")'.dependencies]
+eframe = { version = "0.36.2", default-features = false, features = ["x11", "wayland"], optional = true }
+# The ffmpeg builds for Linux come as .tar.xz.
+lzma-rust2 = { version = "0.21.0", default-features = false, features = ["std", "xz", "optimization"] }
+tar = { version = "0.4.46", default-features = false }
+
+# Tests build .tar.xz archives.
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+lzma-rust2 = { version = "0.21.0", default-features = false, features = ["std", "xz", "encoder"] }
 
 [build-dependencies]
 embed-resource = "3.0.11"
