@@ -19,7 +19,7 @@ case $(uname -m) in
     aarch64 | arm64) arch=aarch64 debarch=arm64 ;;
     *) echo "Unbekannter Prozessor: $(uname -m)" >&2; exit 1 ;;
 esac
-bin=target/release
+bin=${CARGO_TARGET_DIR:-target}/release
 for program in omnidl omnidl-cli; do
     [ -x "$bin/$program" ] || { echo "$bin/$program fehlt, erst bauen" >&2; exit 1; }
 done
