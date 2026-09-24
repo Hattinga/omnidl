@@ -1,7 +1,7 @@
 target/
 dist/
-bin/
-browser-extension/
+/bin/
+/browser-extension/
 config.toml
 queue.json
 queue.json.tmp
