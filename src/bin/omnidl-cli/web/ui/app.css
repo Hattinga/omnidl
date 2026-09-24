@@ -209,6 +209,10 @@ svg { display: block; }
 .primary:hover:not(:disabled) { background: color-mix(in srgb, var(--blue) 92%, #000); }
 .primary:active:not(:disabled) { background: color-mix(in srgb, var(--blue) 82%, #000); }
 .primary:disabled { opacity: 0.45; }
+@media (prefers-color-scheme: dark) {
+  /* A large dimmed blue still reads as "on" in the dark; grey says "not yet". */
+  .primary:disabled { opacity: 1; background: var(--control); color: var(--tertiary); }
+}
 .primary.small { height: 30px; min-width: 0; padding: 0 14px; border-radius: 8px; font-size: 13.5px; }
 
 /* ------------------------------------------------------------ later menu */
@@ -398,9 +402,10 @@ svg { display: block; }
 
 .downloads { flex: 1; display: flex; flex-direction: column; margin-top: 22px; }
 
-.list-head { display: flex; align-items: baseline; gap: 8px; min-height: 30px; padding: 0 2px 4px; }
+.list-head { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 2px 4px; }
+.head-text { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .list-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
-.counts { color: var(--secondary); font-size: 13px; }
+.counts { color: var(--secondary); font-size: 13px; white-space: nowrap; }
 .spacer { flex: 1; }
 
 .text-button {
@@ -691,10 +696,13 @@ dialog::backdrop { background: var(--backdrop); }
   .field input, .popup select, .menu-time input, .form-row.stacked input { font-size: 16px; }
   #start { flex: 1; height: 44px; }
   .menu-anchor .symbol { width: 44px; height: 44px; border-radius: 10px; background: var(--card); color: var(--blue); }
-  .options { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 8px; }
-  .segmented { grid-column: 1 / -1; width: 100%; height: 32px; }
+  /* Two rows: kind and format, then quality and the playlist switch. */
+  .options { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 10px; align-items: center; }
+  .segmented { width: 100%; height: 34px; }
   .popup select, .popup.narrow select { width: 100%; min-width: 0; height: 34px; }
-  .switch-row { grid-column: 1 / -1; justify-content: space-between; margin: 2px 0 0; padding: 6px 2px 0; }
+  .switch-row { margin: 0; padding-left: 2px; }
+  .head-text { flex-direction: column; align-items: flex-start; gap: 0; }
+  .list-head { padding-bottom: 6px; }
   .row { gap: 10px; padding-left: 10px; }
   .row.child { padding-left: 30px; }
   .row:not(:last-child)::after { left: 42px; }
