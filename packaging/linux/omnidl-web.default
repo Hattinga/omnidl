@@ -7,5 +7,6 @@
 # Zielordner der Downloads; der Benutzer "omnidl" muss hineinschreiben dürfen.
 #OMNIDL_WEB_DIR=/var/lib/omnidl/downloads
 
-# Passwort für das Web-Interface. Dringend empfohlen, sobald es im Netz erreichbar ist.
+# Passwort für das Web-Interface. Ohne erzeugt omnidl beim ersten Start eines, speichert
+# es in /var/lib/omnidl/web.toml und zeigt es im Protokoll: journalctl -u omnidl-web
 #OMNIDL_PASSWORD=

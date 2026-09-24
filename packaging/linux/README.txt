@@ -45,7 +45,9 @@ Das Paket omnidl-cli_<version>_<amd64|arm64>.deb bringt einen systemd-Dienst mit
 (eigener Benutzer "omnidl", Daten und Downloads in /var/lib/omnidl):
 
   sudo apt install ./omnidl-cli_<version>_amd64.deb
-  sudoedit /etc/default/omnidl-web          # OMNIDL_PASSWORD setzen
   sudo systemctl enable --now omnidl-web    # http://<server>:8080
+  journalctl -u omnidl-web                  # zeigt das erzeugte Passwort
+
+Eigenes Passwort, Adresse und Zielordner: /etc/default/omnidl-web
 
 Mehr: https://github.com/Hattinga/omnidl

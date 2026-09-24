@@ -25,9 +25,10 @@ if [ "$1" = configure ]; then
 
 omnidl-cli ist installiert.
   Im Terminal:      omnidl-cli get <Link>
-  Web-Interface:    Passwort in /etc/default/omnidl-web setzen, dann
-                    sudo systemctl enable --now omnidl-web
-                    -> http://<dieser-Rechner>:8080  (Downloads in /var/lib/omnidl/downloads)
+  Web-Interface:    sudo systemctl enable --now omnidl-web
+                    -> http://<dieser-Rechner>:8080, Downloads in /var/lib/omnidl/downloads
+  Einstellungen:    /etc/default/omnidl-web (Adresse, Ordner, Passwort); ohne Passwort
+                    erzeugt omnidl eines: journalctl -u omnidl-web
 
 EOF
     fi

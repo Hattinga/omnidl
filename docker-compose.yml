@@ -9,7 +9,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      # Strongly recommended as soon as the interface is reachable from the network.
+      # Without it omnidl makes one up and prints it: docker compose logs omnidl
       OMNIDL_PASSWORD: "bitte-ändern"
     volumes:
       - omnidl-data:/data
