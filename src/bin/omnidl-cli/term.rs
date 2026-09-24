@@ -177,11 +177,13 @@ pub struct Steps {
 
 impl Steps {
     pub fn due(&mut self, msg: &str, now: Instant) -> bool {
-        // "Lade ffmpeg … 45 %" is the step "Lade ffmpeg ".
-        let step = msg.split('…').next().unwrap_or(msg);
+        // "Lade ffmpeg … 45 %" is the step "Lade ffmpeg " with progress " 45 %".
+        let (step, progress) = msg.split_once('…').unwrap_or((msg, ""));
         let due = match &self.last {
-            Some((last, at)) => last != step || now.duration_since(*at) >= Duration::from_secs(5),
-            None => true,
+            Some((last, at)) if last == step => {
+                !progress.trim().is_empty() && now.duration_since(*at) >= Duration::from_secs(5)
+            }
+            _ => true,
         };
         if due {
             self.last = Some((step.to_string(), now));
@@ -325,6 +327,8 @@ mod tests {
         assert!(!steps.due("Lade yt-dlp … 10 %", at(1)));
         assert!(steps.due("Lade yt-dlp … 80 %", at(6)), "nach ein paar Sekunden wieder");
         assert!(steps.due("Lade ffmpeg …", at(7)), "neuer Schritt sofort");
+        assert!(steps.due("Prüfe Tools …", at(8)));
+        assert!(!steps.due("Prüfe Tools …", at(20)), "derselbe Schritt ohne Fortschritt nur einmal");
     }
 
     #[test]
