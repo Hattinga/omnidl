@@ -138,26 +138,27 @@ pub fn job_view(jobs: &Jobs, job: &Job) -> Value {
         obj.remove("output");
         obj.insert("status".into(), json!(status));
         obj.insert("tone".into(), json!(tone));
+        let (download, size) = download_info(jobs, job);
         obj.insert("file".into(), json!(job.output.as_ref().and_then(|p| p.file_name()).map(|n| n.to_string_lossy())));
-        obj.insert("download".into(), json!(download_kind(jobs, job)));
+        obj.insert("download".into(), json!(download));
+        obj.insert("size".into(), json!(size.map(|b| util::fmt_bytes(b as f64))));
         obj.insert("can_retry".into(), json!(!child && job.state.can_retry() && !job.url.is_empty()));
     }
     v
 }
 
-/// "file", "folder" (photo posts) or "zip" (a finished playlist); `None` if there is nothing yet.
-fn download_kind(jobs: &Jobs, job: &Job) -> Option<&'static str> {
+/// "file", "folder" (photo posts) or "zip" (a finished playlist), with the
+/// file size; `None` if there is nothing to fetch yet.
+fn download_info(jobs: &Jobs, job: &Job) -> (Option<&'static str>, Option<u64>) {
     if let Some(path) = &job.output {
-        return if path.is_dir() {
-            Some("folder")
-        } else if path.is_file() {
-            Some("file")
-        } else {
-            None
+        return match std::fs::metadata(path) {
+            Ok(m) if m.is_dir() => (Some("folder"), None),
+            Ok(m) if m.is_file() => (Some("file"), Some(m.len())),
+            _ => (None, None),
         };
     }
     let finished_group = job.is_group() && job.state.is_finished();
-    (finished_group && jobs.children_of(job.id).any(|c| c.output.is_some())).then_some("zip")
+    ((finished_group && jobs.children_of(job.id).any(|c| c.output.is_some())).then_some("zip"), None)
 }
 
 /// The paths a job may hand out, read under the lock; the file system is
@@ -257,6 +258,7 @@ mod tests {
         assert!(job.get("output").is_none());
         assert_eq!(job["file"], "Video.mp4");
         assert_eq!(job["download"], "file");
+        assert_eq!(job["size"], "1 B");
         assert_eq!(job["can_retry"], false);
         assert_eq!(job["tone"], "normal");
     }

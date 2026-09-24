@@ -208,7 +208,7 @@ svg { display: block; }
 }
 .primary:hover:not(:disabled) { background: color-mix(in srgb, var(--blue) 92%, #000); }
 .primary:active:not(:disabled) { background: color-mix(in srgb, var(--blue) 82%, #000); }
-.primary:disabled { background: color-mix(in srgb, var(--blue) 45%, var(--bg)); color: rgba(255, 255, 255, 0.85); }
+.primary:disabled { opacity: 0.45; }
 .primary.small { height: 30px; min-width: 0; padding: 0 14px; border-radius: 8px; font-size: 13.5px; }
 
 /* ------------------------------------------------------------ later menu */
@@ -621,7 +621,7 @@ dialog::backdrop { background: var(--backdrop); }
   font-size: 13.5px;
 }
 .form-row.stacked input:focus { outline: 0; border-color: var(--blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 35%, transparent); }
-.form-row.stacked input[readonly] { color: var(--secondary); background: transparent; border-style: dashed; }
+.form-row .path { color: var(--secondary); font-size: 13.5px; overflow-wrap: anywhere; }
 
 .stepper { display: inline-flex; flex: none; height: 26px; border-radius: 7px; background: var(--track); overflow: hidden; }
 .stepper button {
@@ -723,3 +723,8 @@ dialog::backdrop { background: var(--backdrop); }
   *, *::before, *::after { transition: none !important; animation-duration: 0.01ms !important; }
   .ring.spin { animation: spin 2.4s linear infinite !important; }
 }
+
+/* Nothing half-filled before the first state arrives. */
+body:not(.ready):not(.login-page) .options,
+body:not(.ready):not(.login-page) .downloads,
+body:not(.ready):not(.login-page) .foot { visibility: hidden; }

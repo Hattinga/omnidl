@@ -70,6 +70,7 @@ async function loadState() {
     state.auth = s.auth;
     for (const [kind, data] of state.pending) apply(kind, data);
     state.loaded = true;
+    document.body.classList.add('ready');
     settingsChanged();
     render();
   } catch (e) {
@@ -280,7 +281,9 @@ function settingsChanged() {
 
   const dirInput = $('dir-input');
   if (document.activeElement !== dirInput) dirInput.value = s.download_dir;
-  dirInput.readOnly = state.dirLocked;
+  dirInput.hidden = state.dirLocked;
+  $('dir-fixed').hidden = !state.dirLocked;
+  $('dir-fixed').textContent = s.download_dir;
   if (!$('dir-note').classList.contains('error')) {
     $('dir-note').textContent = state.dirLocked
       ? 'Beim Start mit --dir festgelegt.'
@@ -423,6 +426,11 @@ function statusLine(job, child) {
   if (scheduled(job)) {
     const when = `Startet ${describe(job.state.detail)}`;
     return child ? when : `${job.source} · ${when}`;
+  }
+  // Finished files say what they are and how big, before they go onto a phone.
+  if (job.download === 'file' && job.state.kind === 'done') {
+    const ext = job.file && job.file.includes('.') ? job.file.split('.').pop().toUpperCase() : '';
+    return [job.status, ext, job.size].filter(Boolean).join(' · ');
   }
   return job.status;
 }
