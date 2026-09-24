@@ -264,9 +264,8 @@ async fn prepare_tools(shared: &Shared, force: bool) {
         // yt-dlp is about to be replaced; new jobs wait for it.
         shared.ready.send_replace(false);
     }
-    let mut status = deps::status(&shared.tools).await;
-    status.busy = Some("Prüfe Tools …".into());
-    shared.emit_deps(status);
+    // Versions follow once the check is through; asking yt-dlp twice costs a second.
+    shared.emit_deps(DepsStatus { busy: Some("Prüfe Tools …".into()), ..Default::default() });
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     let reporter = {
