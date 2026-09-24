@@ -2,6 +2,7 @@
 //! interface for servers and NAS boxes (`serve`). Needs no graphics libraries.
 
 mod get;
+mod term;
 mod tools;
 mod web;
 
