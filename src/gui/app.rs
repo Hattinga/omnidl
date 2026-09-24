@@ -753,7 +753,7 @@ impl App {
             let b = widgets::symbol_button_at(ui, slot(), id.with("reveal"), |painter, r, _| {
                 widgets::magnifier(painter, r.center(), 8.5, p.blue);
             });
-            if b.on_hover_text("Im Explorer zeigen").clicked() {
+            if b.on_hover_text(format!("Im {} zeigen", util::FILE_MANAGER)).clicked() {
                 act.reveal = Some(path.clone());
             }
         }
@@ -806,7 +806,7 @@ impl App {
                     Label::new(RichText::new(truncate_start(&dir, 64)).font(regular(12.5)).color(p.secondary))
                         .sense(Sense::click()),
                 )
-                .on_hover_text("Im Explorer öffnen");
+                .on_hover_text(format!("Im {} öffnen", util::FILE_MANAGER));
             if link.clicked() {
                 let _ = std::fs::create_dir_all(&self.cfg.download_dir);
                 util::reveal(&self.cfg.download_dir);
