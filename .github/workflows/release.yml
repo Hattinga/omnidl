@@ -130,12 +130,12 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      - name: Build dependencies
+      # The build itself needs no system libraries (rustls; X11, Wayland and
+      # OpenGL are loaded at run time). This only checks the desktop entry.
+      - name: Tools for the checks
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends pkg-config libssl-dev libgtk-3-dev \
-            libxkbcommon-dev libwayland-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
-            desktop-file-utils
+          sudo apt-get install -y --no-install-recommends desktop-file-utils
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:

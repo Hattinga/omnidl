@@ -99,7 +99,10 @@ copyright = "2026, Jonas Hattinger"
 section = "video"
 priority = "optional"
 revision = ""
-depends = "$auto, ca-certificates"
+# The window libraries are loaded at run time, so $auto cannot see them.
+depends = "$auto, ca-certificates, libgl1, libegl1, libxkbcommon0, libxkbcommon-x11-0, libx11-xcb1, libxcursor1, libxrandr2, libxi6, libwayland-client0, libwayland-cursor0, libwayland-egl1"
+# File dialogs (XDG portal) and opening folders.
+recommends = "xdg-desktop-portal, xdg-utils"
 extended-description = """\
 Link einfügen, Format wählen, fertig: YouTube, TikTok, Spotify, Instagram, \
 SoundCloud und die übrigen Seiten, die yt-dlp kennt. Lädt seine Werkzeuge \
@@ -118,6 +121,8 @@ omnidl ohne Fenster: Downloads im Terminal (omnidl-cli get) und ein \
 Web-Interface für Server und NAS (omnidl-cli serve). Bringt den \
 systemd-Dienst omnidl-web mit, der als Benutzer omnidl läuft und in \
 /var/lib/omnidl speichert; er wird nicht automatisch gestartet."""
+depends = "$auto, ca-certificates"
+recommends = ""
 maintainer-scripts = "packaging/linux/deb/"
 assets = [
     ["target/release/omnidl-cli", "usr/bin/", "755"],
