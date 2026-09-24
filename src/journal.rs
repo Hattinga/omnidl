@@ -39,7 +39,7 @@ pub struct Journal {
 }
 
 impl Journal {
-    #[cfg(test)]
+    /// Keeps nothing on disk (one-off downloads from the terminal, tests).
     pub fn in_memory() -> Self {
         Self { path: None, entries: Mutex::new(Vec::new()) }
     }

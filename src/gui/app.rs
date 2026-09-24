@@ -1,179 +1,19 @@
-use crate::config::{AudioQuality, Config, Cookies, Format, VideoQuality};
-use crate::deps::DepsStatus;
-use crate::engine::{self, Command};
-use crate::job::{Event, JobId, JobState, JobUpdate};
-use crate::launch::Launch;
-use crate::schedule::{self, Preset};
-use crate::theme::{self, Palette, regular, semibold};
-use crate::update::{self, Status as UpdateStatus};
-use crate::widgets::{self, Direction};
-use crate::{detect, extension, util};
+use super::theme::{self, Palette, regular, semibold};
+use super::widgets::{self, Direction};
+use omnidl::config::{AudioQuality, Config, Cookies, Format, VideoQuality};
+use omnidl::deps::DepsStatus;
+use omnidl::engine::{self, Command};
+use omnidl::job::{Event, JobId, JobState};
+use omnidl::jobs::{Job, Jobs, Tone as StatusTone};
+use omnidl::launch::Launch;
+use omnidl::schedule::{self, Preset};
+use omnidl::update::{self, Status as UpdateStatus};
+use omnidl::{detect, extension, util};
 use egui::{
     Align, Align2, Color32, Frame, Label, Layout, Margin, PopupCloseBehavior, Rect, RichText, Sense, Stroke,
     StrokeKind, Ui, ViewportCommand, pos2, vec2,
 };
-use std::collections::HashMap;
 use std::path::PathBuf;
-
-struct Job {
-    id: JobId,
-    parent: Option<JobId>,
-    children: Vec<usize>,
-    /// The link the job was created from; used to try again.
-    url: String,
-    title: String,
-    source: &'static str,
-    state: JobState,
-    frac: Option<f32>,
-    speed: Option<f64>,
-    eta: Option<u64>,
-    item: Option<(u32, u32)>,
-    note: Option<String>,
-    output: Option<PathBuf>,
-    expanded: bool,
-}
-
-impl Job {
-    fn is_group(&self) -> bool {
-        !self.children.is_empty() || self.state == JobState::Group
-    }
-}
-
-/// The download list: jobs in the order they arrived, children linked to their group.
-#[derive(Default)]
-struct Jobs {
-    list: Vec<Job>,
-    index: HashMap<JobId, usize>,
-}
-
-impl Jobs {
-    fn apply(&mut self, id: JobId, update: JobUpdate) {
-        if let JobUpdate::New { parent, url, title, source } = update {
-            let idx = self.list.len();
-            self.list.push(Job {
-                id,
-                parent,
-                children: Vec::new(),
-                url,
-                title,
-                source,
-                state: JobState::Queued,
-                frac: None,
-                speed: None,
-                eta: None,
-                item: None,
-                note: None,
-                output: None,
-                expanded: true,
-            });
-            self.index.insert(id, idx);
-            if let Some(p) = parent.and_then(|p| self.index.get(&p).copied()) {
-                self.list[p].children.push(idx);
-            }
-            return;
-        }
-        let Some(&idx) = self.index.get(&id) else { return };
-        let job = &mut self.list[idx];
-        match update {
-            JobUpdate::New { .. } => {}
-            JobUpdate::Title(t) => job.title = t,
-            JobUpdate::State(s) => {
-                if s.is_finished() {
-                    job.speed = None;
-                    job.eta = None;
-                    if s == JobState::Done {
-                        job.frac = Some(1.0);
-                    }
-                }
-                job.state = s;
-            }
-            JobUpdate::Progress { frac, speed, eta } => {
-                job.frac = frac;
-                job.speed = speed;
-                job.eta = eta;
-            }
-            JobUpdate::Item { index, count } => job.item = Some((index, count)),
-            JobUpdate::Output(p) => job.output = Some(p),
-            JobUpdate::Note(n) => job.note = (!n.is_empty()).then_some(n),
-        }
-    }
-
-    fn get(&self, id: JobId) -> Option<&Job> {
-        self.index.get(&id).map(|&i| &self.list[i])
-    }
-
-    fn running(&self, idx: usize) -> bool {
-        let job = &self.list[idx];
-        !job.state.is_finished() || job.children.iter().any(|&c| !self.list[c].state.is_finished())
-    }
-
-    /// Drops finished entries; a group stays as long as anything in it runs.
-    fn clear_finished(&mut self) {
-        let keep: Vec<bool> = (0..self.list.len())
-            .map(|i| {
-                let parent = self.list[i].parent.and_then(|p| self.index.get(&p).copied());
-                self.running(i) || parent.is_some_and(|p| self.running(p))
-            })
-            .collect();
-        self.retain(|i, _| keep[i]);
-    }
-
-    /// Removes a job together with its children (before trying it again).
-    fn remove_tree(&mut self, id: JobId) {
-        self.retain(|_, j| j.id != id && j.parent != Some(id));
-    }
-
-    fn retain(&mut self, keep: impl Fn(usize, &Job) -> bool) {
-        let kept: Vec<Job> = std::mem::take(&mut self.list)
-            .into_iter()
-            .enumerate()
-            .filter(|(i, j)| keep(*i, j))
-            .map(|(_, j)| j)
-            .collect();
-        // Rebuild indices and child links.
-        self.list = kept;
-        self.index = self.list.iter().enumerate().map(|(i, j)| (j.id, i)).collect();
-        let links: Vec<Option<usize>> =
-            self.list.iter().map(|j| j.parent.and_then(|p| self.index.get(&p).copied())).collect();
-        for j in &mut self.list {
-            j.children.clear();
-        }
-        for (child, parent) in links.into_iter().enumerate() {
-            if let Some(p) = parent {
-                self.list[p].children.push(child);
-            }
-        }
-    }
-
-    /// Top-level jobs newest first, each followed by its children when expanded.
-    fn visible_rows(&self) -> Vec<(usize, bool)> {
-        let mut rows = Vec::new();
-        for idx in (0..self.list.len()).rev() {
-            let job = &self.list[idx];
-            if job.parent.is_some() {
-                continue;
-            }
-            rows.push((idx, false));
-            if job.expanded {
-                rows.extend(job.children.iter().map(|&c| (c, true)));
-            }
-        }
-        rows
-    }
-
-    /// Whether something on screen spins and needs continuous repaints.
-    fn animating(&self) -> bool {
-        self.list.iter().any(|j| match j.state {
-            JobState::Resolving | JobState::Processing => true,
-            JobState::Downloading | JobState::Group => j.frac.is_none(),
-            _ => false,
-        })
-    }
-
-    fn top_level(&self) -> impl Iterator<Item = &Job> {
-        self.list.iter().filter(|j| j.parent.is_none())
-    }
-}
 
 pub struct App {
     cmd: tokio::sync::mpsc::UnboundedSender<Command>,
@@ -210,12 +50,21 @@ impl App {
     ) -> Self {
         theme::install(&cc.egui_ctx);
         let bridge = listener.as_ref().map(|_| ()).map_err(Clone::clone);
-        let (cmd, events) = engine::start(engine::Start {
-            ctx: cc.egui_ctx.clone(),
+        let (tx, events) = std::sync::mpsc::channel::<Event>();
+        let (tx, ctx) = (std::sync::Mutex::new(tx), cc.egui_ctx.clone());
+        let sink: engine::Sink = std::sync::Arc::new(move |ev| {
+            if tx.lock().unwrap().send(ev).is_ok() {
+                ctx.request_repaint();
+            }
+        });
+        let cmd = engine::start(engine::Start {
+            sink,
             base: base.clone(),
             cfg: cfg.clone(),
+            journal: Some(base.join("queue.json")),
             listener: listener.ok(),
             launch,
+            check_updates: true,
         });
         Self {
             cmd,
@@ -1184,64 +1033,13 @@ fn status_symbol(painter: &egui::Painter, c: egui::Pos2, r: f32, job: &Job, time
 }
 
 fn status_line(job: &Job, child: bool, p: &Palette) -> (String, Color32) {
-    let mut parts: Vec<String> = Vec::new();
-    if !child {
-        parts.push(job.source.to_string());
-    }
-    let lead = parts.len();
-    let mut color = p.secondary;
-    match &job.state {
-        JobState::Scheduled(at) => parts.push(format!("Startet {}", schedule::describe_unix(*at))),
-        JobState::Queued => parts.push(job.note.clone().unwrap_or_else(|| "Wartet".into())),
-        JobState::Resolving => parts.push("Suche Quelle …".into()),
-        JobState::Processing => parts.push("Wird umgewandelt …".into()),
-        JobState::Group => parts.push(match job.item {
-            Some((i, n)) => format!("{i} von {n} fertig"),
-            None => "Wird vorbereitet …".into(),
-        }),
-        JobState::Downloading => {
-            if let Some((i, n)) = job.item {
-                parts.push(format!("{i} von {n}"));
-            }
-            if let Some(f) = job.frac {
-                parts.push(format!("{:.0} %", f * 100.0));
-            }
-            if let Some(s) = job.speed {
-                parts.push(format!("{}/s", util::fmt_bytes(s)));
-            }
-            if let Some(e) = job.eta {
-                parts.push(format!("noch {}", util::fmt_eta(e)));
-            }
-            if parts.len() == lead {
-                parts.push("Lädt …".into());
-            }
-        }
-        JobState::Done => parts.push(job.note.clone().unwrap_or_else(|| "Fertig".into())),
-        JobState::NoMatch => {
-            color = p.orange;
-            parts.push("Kein passender Treffer".into());
-        }
-        JobState::Cancelled => parts.push("Gestoppt".into()),
-        JobState::Failed(e) => {
-            color = p.red;
-            parts.push(readable_error(e).to_string());
-        }
-    }
-    (parts.join(" · "), color)
-}
-
-/// First line of a yt-dlp error without the `[extractor] id: ` prefix and the
-/// echoed Python exception. The full text stays available in the tooltip.
-fn readable_error(e: &str) -> &str {
-    let line = e.lines().next().unwrap_or(e);
-    let line = match line.strip_prefix('[').and_then(|r| r.split_once("] ")) {
-        Some((_, rest)) => match rest.split_once(": ") {
-            Some((id, msg)) if !id.contains(' ') && !msg.is_empty() => msg,
-            _ => rest,
-        },
-        None => line,
+    let (text, tone) = job.status(child);
+    let color = match tone {
+        StatusTone::Normal => p.secondary,
+        StatusTone::Warning => p.orange,
+        StatusTone::Error => p.red,
     };
-    line.split(" (caused by ").next().unwrap_or(line).trim()
+    (text, color)
 }
 
 /// Shown instead of the list while nothing has been added.
@@ -1346,114 +1144,21 @@ fn truncate_start(s: &str, max: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn new(jobs: &mut Jobs, id: JobId, parent: Option<JobId>) {
-        let url = format!("https://example.com/{id}");
-        jobs.apply(id, JobUpdate::New { parent, url: url.clone(), title: url, source: "Web" });
-    }
-
-    fn state(jobs: &mut Jobs, id: JobId, s: JobState) {
-        jobs.apply(id, JobUpdate::State(s));
-    }
-
-    fn ids(jobs: &Jobs) -> Vec<JobId> {
-        jobs.list.iter().map(|j| j.id).collect()
-    }
-
-    #[test]
-    fn errors_read_like_sentences() {
-        assert_eq!(
-            readable_error(
-                "[generic] nope: Unable to download webpage: HTTP Error 404: Not Found (caused by <HTTPError 404: Not Found>)"
-            ),
-            "Unable to download webpage: HTTP Error 404: Not Found"
-        );
-        assert_eq!(readable_error("[youtube] abc: Video unavailable\nmore"), "Video unavailable");
-        assert_eq!(readable_error("Kurzlink nicht auflösbar"), "Kurzlink nicht auflösbar");
-        assert_eq!(readable_error("[info] Writing video metadata"), "Writing video metadata");
-    }
-
-    #[test]
-    fn clearing_keeps_whatever_still_runs() {
-        let mut jobs = Jobs::default();
-        new(&mut jobs, 1, None); // fertig
-        new(&mut jobs, 2, None); // Gruppe, ein Kind läuft noch
-        new(&mut jobs, 3, Some(2));
-        new(&mut jobs, 4, Some(2));
-        new(&mut jobs, 5, None); // läuft
-        state(&mut jobs, 1, JobState::Done);
-        state(&mut jobs, 2, JobState::Group);
-        state(&mut jobs, 3, JobState::Done);
-        state(&mut jobs, 4, JobState::Downloading);
-        state(&mut jobs, 5, JobState::Queued);
-
-        jobs.clear_finished();
-        assert_eq!(ids(&jobs), vec![2, 3, 4, 5], "fertige Kinder laufender Gruppen bleiben");
-        assert_eq!(jobs.get(2).unwrap().children.len(), 2, "Verknüpfungen neu aufgebaut");
-
-        state(&mut jobs, 4, JobState::Done);
-        state(&mut jobs, 2, JobState::Done);
-        jobs.clear_finished();
-        assert_eq!(ids(&jobs), vec![5]);
-        // Updates for the remaining job still land in the right row.
-        jobs.apply(5, JobUpdate::Title("neu".into()));
-        assert_eq!(jobs.get(5).unwrap().title, "neu");
-    }
-
-    #[test]
-    fn retry_removes_the_whole_group() {
-        let mut jobs = Jobs::default();
-        new(&mut jobs, 1, None);
-        new(&mut jobs, 2, Some(1));
-        new(&mut jobs, 3, None);
-        new(&mut jobs, 4, Some(1));
-        jobs.remove_tree(1);
-        assert_eq!(ids(&jobs), vec![3]);
-        assert!(jobs.get(2).is_none());
-    }
-
-    #[test]
-    fn rows_newest_first_with_children_under_their_group() {
-        let mut jobs = Jobs::default();
-        new(&mut jobs, 1, None);
-        new(&mut jobs, 2, None);
-        new(&mut jobs, 3, Some(2));
-        new(&mut jobs, 4, Some(2));
-        let rows: Vec<(JobId, bool)> = jobs.visible_rows().into_iter().map(|(i, c)| (jobs.list[i].id, c)).collect();
-        assert_eq!(rows, vec![(2, false), (3, true), (4, true), (1, false)]);
-
-        jobs.list[1].expanded = false;
-        assert_eq!(jobs.visible_rows().len(), 2, "zugeklappt: nur die Gruppen");
-    }
-
-    #[test]
-    fn notes_come_and_go() {
-        let mut jobs = Jobs::default();
-        new(&mut jobs, 1, None);
-        jobs.apply(1, JobUpdate::Note("Wartet auf die Werkzeuge …".into()));
-        let p = theme::of(false);
-        assert_eq!(status_line(jobs.get(1).unwrap(), false, p).0, "Web · Wartet auf die Werkzeuge …");
-        jobs.apply(1, JobUpdate::Note(String::new()));
-        assert_eq!(status_line(jobs.get(1).unwrap(), false, p).0, "Web · Wartet");
-    }
-
-    #[test]
-    fn scheduled_jobs_show_their_start() {
-        let mut jobs = Jobs::default();
-        new(&mut jobs, 1, None);
-        let at = schedule::to_unix(schedule::next_at(schedule::local_now(), 23, 55));
-        state(&mut jobs, 1, JobState::Scheduled(at));
-        let (line, _) = status_line(jobs.get(1).unwrap(), false, theme::of(true));
-        assert!(line.starts_with("Web · Startet "), "{line}");
-        assert!(line.ends_with("um 23:55"), "{line}");
-        assert!(!jobs.animating(), "geplante Jobs brauchen kein Neuzeichnen");
-        assert!(!JobState::Scheduled(at).is_finished());
-        assert!(!JobState::Scheduled(at).can_retry());
-    }
+    use omnidl::job::JobUpdate;
 
     #[test]
     fn long_paths_keep_their_end() {
         assert_eq!(truncate_start("C:/kurz", 10), "C:/kurz");
         assert_eq!(truncate_start("C:/Users/name/Downloads/omnidl", 12), "…oads/omnidl");
+    }
+
+    #[test]
+    fn status_colors_follow_the_tone() {
+        let mut jobs = Jobs::default();
+        let url = "https://example.com/1".to_string();
+        jobs.apply(1, JobUpdate::New { parent: None, url: url.clone(), title: url, source: "Web" });
+        jobs.apply(1, JobUpdate::State(JobState::Failed("kaputt".into())));
+        let p = theme::of(false);
+        assert_eq!(status_line(jobs.get(1).unwrap(), false, p), ("Web · kaputt".to_string(), p.red));
     }
 }

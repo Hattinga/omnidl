@@ -1,7 +1,7 @@
 //! Controls and symbols in the style of Apple's Human Interface Guidelines.
 //! Symbols are painted, not taken from a font, so they stay crisp at any scale.
 
-use crate::theme::{self, mix, regular, semibold};
+use super::theme::{self, mix, regular, semibold};
 use egui::{
     Align2, Color32, CornerRadius, Painter, Pos2, Rect, Response, Sense, Shape, Stroke, StrokeKind, Ui, Vec2,
     WidgetInfo, WidgetType, pos2, vec2,

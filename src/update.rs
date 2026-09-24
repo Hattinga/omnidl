@@ -15,7 +15,7 @@ const SHA_ASSET: &str = "omnidl.exe.sha256";
 /// Points the updater at another server, for testing the whole flow.
 const URL_OVERRIDE: &str = "OMNIDL_UPDATE_URL";
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 pub struct Release {
     pub version: String,
     pub page: String,
@@ -23,7 +23,8 @@ pub struct Release {
     sha_url: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
 pub enum Status {
     #[default]
     Idle,

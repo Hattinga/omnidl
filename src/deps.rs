@@ -48,7 +48,7 @@ fn which_node() -> Option<PathBuf> {
         .find(|p| p.is_file())
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize)]
 pub struct DepsStatus {
     pub ytdlp: Option<String>,
     /// Days since yt-dlp was last refreshed, at most the age of its release.

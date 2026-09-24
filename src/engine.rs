@@ -28,21 +28,29 @@ pub enum Command {
     InstallUpdate(update::Release),
 }
 
+/// Receives everything the engine reports: job progress, tool status, updates.
+/// The window, the terminal and the web interface each bring their own.
+pub type Sink = Arc<dyn Fn(Event) + Send + Sync>;
+
 /// What the engine needs to start.
 pub struct Start {
-    pub ctx: egui::Context,
+    pub sink: Sink,
+    /// Folder with `bin/` (the tools).
     pub base: PathBuf,
     pub cfg: Config,
+    /// Where unfinished downloads survive a restart; `None` keeps them in memory only.
+    pub journal: Option<PathBuf>,
     /// Port for the browser extension, if this instance got it.
     pub listener: Option<std::net::TcpListener>,
     /// Links omnidl was started with.
     pub launch: Launch,
+    /// Look for new omnidl versions in the background.
+    pub check_updates: bool,
 }
 
 #[derive(Clone)]
 pub struct Shared {
-    tx: std::sync::mpsc::Sender<Event>,
-    ctx: egui::Context,
+    sink: Sink,
     pub tools: Arc<Tools>,
     sem: Arc<Semaphore>,
     parallel: Arc<Mutex<usize>>,
@@ -58,17 +66,10 @@ pub struct Shared {
 }
 
 impl Shared {
-    fn new(
-        tx: std::sync::mpsc::Sender<Event>,
-        ctx: egui::Context,
-        tools: Tools,
-        journal: Journal,
-        cfg: Config,
-    ) -> Self {
+    fn new(sink: Sink, tools: Tools, journal: Journal, cfg: Config) -> Self {
         let parallel = cfg.parallel.clamp(1, 16);
         Self {
-            tx,
-            ctx,
+            sink,
             tools: Arc::new(tools),
             sem: Arc::new(Semaphore::new(parallel)),
             parallel: Arc::new(Mutex::new(parallel)),
@@ -83,9 +84,7 @@ impl Shared {
     }
 
     fn send(&self, event: Event) {
-        if self.tx.send(event).is_ok() {
-            self.ctx.request_repaint();
-        }
+        (self.sink)(event);
     }
 
     pub fn emit(&self, id: JobId, update: JobUpdate) {
@@ -178,15 +177,16 @@ impl Shared {
     }
 }
 
-pub fn start(s: Start) -> (tokio::sync::mpsc::UnboundedSender<Command>, std::sync::mpsc::Receiver<Event>) {
+/// Starts the engine on its own thread and runtime; commands go in through
+/// the returned sender, everything else comes out through `s.sink`.
+pub fn start(s: Start) -> tokio::sync::mpsc::UnboundedSender<Command> {
     let (cmd_tx, mut cmd_rx) = tokio::sync::mpsc::unbounded_channel::<Command>();
-    let (ev_tx, ev_rx) = std::sync::mpsc::channel::<Event>();
 
     std::thread::spawn(move || {
         let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
             Ok(rt) => rt,
             Err(e) => {
-                let _ = ev_tx.send(Event::Deps(DepsStatus {
+                (s.sink)(Event::Deps(DepsStatus {
                     error: Some(format!("Laufzeitumgebung nicht startbar: {e}")),
                     ..Default::default()
                 }));
@@ -194,8 +194,11 @@ pub fn start(s: Start) -> (tokio::sync::mpsc::UnboundedSender<Command>, std::syn
             }
         };
         rt.block_on(async move {
-            let (journal, leftovers) = Journal::open(s.base.join("queue.json"));
-            let shared = Shared::new(ev_tx, s.ctx, Tools::new(&s.base), journal, s.cfg);
+            let (journal, leftovers) = match s.journal {
+                Some(path) => Journal::open(path),
+                None => (Journal::in_memory(), Vec::new()),
+            };
+            let shared = Shared::new(s.sink, Tools::new(&s.base), journal, s.cfg);
 
             // Re-add first: the journal file still holds these until they are.
             for entry in leftovers {
@@ -212,7 +215,7 @@ pub fn start(s: Start) -> (tokio::sync::mpsc::UnboundedSender<Command>, std::syn
                 let s = shared.clone();
                 tokio::spawn(async move { prepare_tools(&s, false).await });
             }
-            {
+            if s.check_updates {
                 let s = shared.clone();
                 tokio::spawn(async move { update_loop(s).await });
             }
@@ -246,7 +249,7 @@ pub fn start(s: Start) -> (tokio::sync::mpsc::UnboundedSender<Command>, std::syn
         });
     });
 
-    (cmd_tx, ev_rx)
+    cmd_tx
 }
 
 fn serve_bridge(shared: &Shared, listener: std::net::TcpListener) {
@@ -813,14 +816,18 @@ mod tests {
     use std::sync::mpsc::Receiver;
     use std::time::Instant;
 
-    /// Engine wired to a headless egui context, using the repo's `bin/` tools.
+    /// Engine reporting into a channel, using the repo's `bin/` tools.
     fn test_env(sub: &str) -> (Shared, Receiver<Event>, Config) {
         let dir = std::env::temp_dir().join("omnidl-tests").join(sub);
         let _ = std::fs::remove_dir_all(&dir);
         let (tx, rx) = std::sync::mpsc::channel();
         let cfg = Config { download_dir: dir, parallel: 4, ..Config::default() };
         let tools = Tools::new(Path::new(env!("CARGO_MANIFEST_DIR")));
-        let mut shared = Shared::new(tx, egui::Context::default(), tools, Journal::in_memory(), cfg.clone());
+        let tx = Mutex::new(tx);
+        let sink: Sink = Arc::new(move |ev| {
+            let _ = tx.lock().unwrap().send(ev);
+        });
+        let mut shared = Shared::new(sink, tools, Journal::in_memory(), cfg.clone());
         shared.peek_titles = false;
         (shared, rx, cfg)
     }

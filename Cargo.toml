@@ -4,22 +4,50 @@ version = "0.2.0"
 edition = "2024"
 description = "Desktop-Downloader für YouTube, TikTok, Spotify und rund 1800 weitere Seiten"
 build = "build.rs"
+license = "MIT"
+repository = "https://github.com/Hattinga/omnidl"
+autobins = false
+
+[lib]
+name = "omnidl"
+path = "src/lib.rs"
+
+# The desktop app.
+[[bin]]
+name = "omnidl"
+path = "src/main.rs"
+required-features = ["gui"]
+
+# Terminal downloads and the web interface for servers; needs no graphics libraries.
+[[bin]]
+name = "omnidl-cli"
+path = "src/bin/omnidl-cli/main.rs"
+required-features = ["cli"]
+
+[features]
+default = ["gui", "cli"]
+gui = ["dep:eframe", "dep:egui", "dep:rfd"]
+cli = ["dep:clap", "dep:axum", "dep:tokio-stream", "dep:getrandom"]
 
 [dependencies]
 anyhow = "1.0.104"
+axum = { version = "0.8.9", optional = true }
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
-eframe = { version = "0.36.2", default-features = false, features = ["default_fonts", "glow"] }
-egui = "0.36.2"
+clap = { version = "4.6.7", features = ["derive"], optional = true }
+eframe = { version = "0.36.2", default-features = false, features = ["default_fonts", "glow"], optional = true }
+egui = { version = "0.36.2", optional = true }
 futures-util = "0.3.34"
+getrandom = { version = "0.4.3", optional = true }
 lofty = "0.25.4"
 regex = "1.13.1"
 reqwest = { version = "0.13.5", default-features = false, features = ["http2", "json", "native-tls", "stream"] }
-rfd = "0.17.2"
+rfd = { version = "0.17.2", optional = true }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 sha2 = "0.10.9"
 strsim = "0.11.1"
-tokio = { version = "1.53.1", features = ["rt-multi-thread", "process", "sync", "io-util", "macros", "time", "net"] }
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "process", "sync", "io-util", "macros", "time", "net", "signal"] }
+tokio-stream = { version = "0.1.19", features = ["sync"], optional = true }
 tokio-util = "0.7.19"
 toml = "1.1.6"
 urlencoding = "2.1.3"

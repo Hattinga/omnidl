@@ -1,10 +1,12 @@
 use crate::deps::DepsStatus;
 use crate::update;
+use serde::Serialize;
 use std::path::PathBuf;
 
 pub type JobId = u64;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(tag = "kind", content = "detail", rename_all = "lowercase")]
 pub enum JobState {
     /// Waits for its start time (Unix seconds).
     Scheduled(i64),

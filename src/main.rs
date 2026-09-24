@@ -1,29 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod app;
-mod bridge;
-mod config;
-mod deps;
-mod detect;
-mod engine;
-mod extension;
-mod gallery;
-mod job;
-mod journal;
-mod launch;
-mod matcher;
-mod peek;
-mod schedule;
-mod spotify;
-mod sys;
-mod tagger;
-mod theme;
-mod update;
-mod util;
-mod widgets;
-mod ytdlp;
+//! The desktop app. The core lives in the `omnidl` library; this is the window.
 
-use bridge::Claim;
+mod gui;
+
+use gui::app;
+use omnidl::bridge::{self, Claim};
+use omnidl::{config, launch, sys, update};
 
 fn main() -> eframe::Result {
     let launch = launch::parse(std::env::args().skip(1));
