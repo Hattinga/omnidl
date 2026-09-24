@@ -1,0 +1,82 @@
+<!--
+  omnidl installer: per user, no administrator rights, into
+  %LOCALAPPDATA%\Programs\omnidl. The app downloads its tools into that folder
+  and replaces its own exe when updating, so it has to be writable.
+
+  Build (see packaging/release.ps1):
+    wix build installer/omnidl.wxs -arch x64 -d Version=0.2.0 -d Exe=target/release/omnidl.exe -o dist/omnidl-0.2.0-x64.msi
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="omnidl"
+    Manufacturer="omnidl"
+    Version="$(var.Version)"
+    UpgradeCode="2825E7F5-088E-4A5F-B8F4-5EF130E2DE4C"
+    Scope="perUser"
+    Language="1031"
+    Codepage="1252">
+
+    <!-- Keep every version on the same components so an upgrade leaves the
+         downloaded tools and settings alone. -->
+    <MajorUpgrade DowngradeErrorMessage="Eine neuere Version von omnidl ist bereits installiert." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="omnidl.ico" SourceFile="$(sys.SOURCEFILEDIR)..\assets\omnidl.ico" />
+    <Property Id="ARPPRODUCTICON" Value="omnidl.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/Hattinga/omnidl" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/Hattinga/omnidl#readme" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="omnidl" />
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Per-user components need a registry key path (ICE38). -->
+    <Component Id="App" Directory="INSTALLFOLDER" Guid="C4937D1B-52D6-46E7-A614-BB1AAC96B5AF">
+      <RegistryValue Root="HKCU" Key="Software\omnidl" Name="InstallDir" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+      <File Id="omnidl.exe" Source="$(var.Exe)" Name="omnidl.exe" />
+      <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
+      <RemoveFolder Id="RemoveProgramsFolder" Directory="ProgramsFolder" On="uninstall" />
+
+      <!-- omnidl:// so the browser extension can start the app. -->
+      <RegistryKey Root="HKCU" Key="Software\Classes\omnidl">
+        <RegistryValue Type="string" Value="URL:omnidl" />
+        <RegistryValue Name="URL Protocol" Type="string" Value="" />
+        <RegistryValue Key="DefaultIcon" Type="string" Value="&quot;[INSTALLFOLDER]omnidl.exe&quot;,0" />
+        <RegistryValue Key="shell\open\command" Type="string" Value="&quot;[INSTALLFOLDER]omnidl.exe&quot; &quot;%1&quot;" />
+      </RegistryKey>
+    </Component>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenu">
+        <Shortcut
+          Id="StartMenuShortcut"
+          Name="omnidl"
+          Description="Videos und Musik laden"
+          Target="[INSTALLFOLDER]omnidl.exe"
+          WorkingDirectory="INSTALLFOLDER"
+          Icon="omnidl.ico" />
+        <RegistryValue Root="HKCU" Key="Software\omnidl" Name="StartMenu" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <Feature Id="Main">
+      <ComponentRef Id="App" />
+      <ComponentRef Id="StartMenu" />
+    </Feature>
+
+    <!-- On a real uninstall (not an upgrade) the app removes what it created
+         itself: the ~500 MB of tools, the extension folder, settings, queue. -->
+    <CustomAction Id="CleanUp" FileRef="omnidl.exe" ExeCommand="--uninstall" Execute="deferred" Impersonate="yes" Return="ignore" />
+    <!-- After an interactive install, open the app. -->
+    <CustomAction Id="Launch" FileRef="omnidl.exe" ExeCommand="" Execute="immediate" Impersonate="yes" Return="asyncNoWait" />
+
+    <InstallExecuteSequence>
+      <Custom Action="CleanUp" Before="RemoveFiles" Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="Launch" After="InstallFinalize" Condition="NOT Installed AND NOT REMOVE AND UILevel &gt; 3" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

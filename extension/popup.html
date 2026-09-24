@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>omnidl</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="icons/32.png" width="18" height="18" alt="">
+    <span class="app">omnidl</span>
+    <span id="state" class="state"><span class="dot"></span><span id="state-text">…</span></span>
+  </header>
+
+  <section class="card">
+    <div id="title" class="title">&nbsp;</div>
+    <div id="host" class="host">&nbsp;</div>
+  </section>
+
+  <div class="buttons">
+    <button id="video" class="primary" disabled>Video laden</button>
+    <button id="audio" disabled>Audio laden</button>
+  </div>
+
+  <p id="message" class="message">&nbsp;</p>
+
+  <script src="omnidl.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

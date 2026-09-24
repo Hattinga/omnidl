@@ -1,0 +1,121 @@
+:root {
+  --bg: #f2f2f7;
+  --card: #ffffff;
+  --label: #1d1d1f;
+  --secondary: #6e6e73;
+  --control: #ffffff;
+  --control-border: #d1d1d6;
+  --blue: #007aff;
+  --green: #248a3d;
+  --red: #d70015;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1c1e;
+    --card: #2c2c2e;
+    --label: #f5f5f7;
+    --secondary: #98989d;
+    --control: #3a3a3c;
+    --control-border: transparent;
+    --blue: #0a84ff;
+    --green: #30d158;
+    --red: #ff453a;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  width: 300px;
+  margin: 0;
+  padding: 14px 14px 10px;
+  background: var(--bg);
+  color: var(--label);
+  font: 13px/1.35 -apple-system, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.app { font-weight: 600; font-size: 14px; }
+
+.state {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--secondary);
+  font-size: 12px;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--secondary);
+  opacity: 0.6;
+}
+
+.state.on .dot { background: #34c759; opacity: 1; }
+
+.card {
+  background: var(--card);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.title {
+  font-weight: 500;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.host { color: var(--secondary); font-size: 12px; margin-top: 2px; }
+
+.buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+button {
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--control-border);
+  background: var(--control);
+  color: var(--label);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) { filter: brightness(0.96); }
+button:active:not(:disabled) { filter: brightness(0.9); }
+button:focus-visible { outline: 3px solid color-mix(in srgb, var(--blue) 35%, transparent); outline-offset: 1px; }
+button:disabled { opacity: 0.45; cursor: default; }
+
+button.primary {
+  background: var(--blue);
+  border-color: transparent;
+  color: #fff;
+}
+
+.message {
+  min-height: 1.35em;
+  margin: 9px 2px 0;
+  color: var(--secondary);
+  font-size: 12px;
+}
+
+.message.ok { color: var(--green); }
+.message.error { color: var(--red); }

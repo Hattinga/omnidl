@@ -1,0 +1,12 @@
+target/
+dist/
+bin/
+browser-extension/
+config.toml
+queue.json
+queue.json.tmp
+*.wixpdb
+/omnidl.exe
+/omnidl.exe.old
+/omnidl.exe.new
+/notes.md
