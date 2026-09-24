@@ -74,7 +74,8 @@ if [ -z "$version" ]; then
 fi
 
 name="omnidl-$version-linux-$arch"
-url="https://github.com/$REPO/releases/download/v$version/$name.tar.gz"
+# OMNIDL_INSTALL_BASE: another download folder, for testing the script.
+url="${OMNIDL_INSTALL_BASE:-https://github.com/$REPO/releases/download/v$version}/$name.tar.gz"
 echo "omnidl $version ($arch) wird geladen ..."
 fetch "$url" "$tmp/$name.tar.gz" || die "Download fehlgeschlagen: $url"
 fetch "$url.sha256" "$tmp/$name.tar.gz.sha256" || die "Prüfsumme fehlt: $url.sha256"

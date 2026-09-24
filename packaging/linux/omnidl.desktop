@@ -7,7 +7,7 @@ Comment[de]=Videos und Musik laden: YouTube, TikTok, Spotify und rund 1800 weite
 Exec=omnidl %u
 Icon=omnidl
 Terminal=false
-Categories=Network;AudioVideo;
+Categories=Network;FileTransfer;
 Keywords=youtube;download;yt-dlp;mp3;video;music;
 # omnidl:// lets the browser extension start the app.
 MimeType=x-scheme-handler/omnidl;
