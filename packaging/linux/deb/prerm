@@ -1,0 +1,9 @@
+#!/bin/sh
+# Stops and disables the web service when the package goes away (not on upgrades).
+set -e
+
+if [ "$1" = remove ] && [ -d /run/systemd/system ]; then
+    systemctl disable --now omnidl-web.service >/dev/null 2>&1 || true
+fi
+
+exit 0

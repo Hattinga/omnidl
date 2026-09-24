@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=omnidl
+GenericName=Downloader
+Comment=Download videos and music from YouTube, TikTok, Spotify and ~1800 other sites
+Comment[de]=Videos und Musik laden: YouTube, TikTok, Spotify und rund 1800 weitere Seiten
+Exec=omnidl %u
+Icon=omnidl
+Terminal=false
+Categories=Network;AudioVideo;
+Keywords=youtube;download;yt-dlp;mp3;video;music;
+# omnidl:// lets the browser extension start the app.
+MimeType=x-scheme-handler/omnidl;
+StartupNotify=true
+StartupWMClass=omnidl

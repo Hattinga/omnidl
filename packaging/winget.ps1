@@ -42,6 +42,8 @@ InstallModes:
 UpgradeBehavior: install
 Protocols:
 - omnidl
+Commands:
+- omnidl-cli
 Installers:
 - Architecture: x64
   InstallerUrl: $url

@@ -1,0 +1,39 @@
+# omnidl web interface as a system service (installed by the omnidl-cli .deb).
+#   sudo systemctl enable --now omnidl-web
+# Settings (address, download folder, password): /etc/default/omnidl-web
+[Unit]
+Description=omnidl web interface
+Documentation=https://github.com/Hattinga/omnidl
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=omnidl
+Group=omnidl
+# Tools (yt-dlp, ffmpeg, ...), settings and queue.
+Environment=OMNIDL_HOME=/var/lib/omnidl
+Environment=OMNIDL_WEB_LISTEN=0.0.0.0:8080
+Environment=OMNIDL_WEB_DIR=/var/lib/omnidl/downloads
+# Overrides the defaults above; may set OMNIDL_PASSWORD. Readable by root only.
+EnvironmentFile=-/etc/default/omnidl-web
+ExecStart=/usr/bin/omnidl-cli serve --listen ${OMNIDL_WEB_LISTEN} --dir ${OMNIDL_WEB_DIR}
+# Creates /var/lib/omnidl and its downloads folder for the omnidl user.
+StateDirectory=omnidl omnidl/downloads
+StateDirectoryMode=0750
+WorkingDirectory=/var/lib/omnidl
+Restart=on-failure
+RestartSec=5
+UMask=0022
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=full
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target
