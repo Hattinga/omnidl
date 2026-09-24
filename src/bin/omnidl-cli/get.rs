@@ -567,10 +567,8 @@ impl Report {
         match (self.mode, &d.busy) {
             (Mode::Json, _) => println!("{}", json!({ "event": "tools", "tools": d })),
             // The routine check at every start is not worth a line.
-            (Mode::Plain, Some(busy)) if !busy.starts_with("Prüfe") => {
-                if self.steps.due(busy, Instant::now()) {
-                    println!("Werkzeuge: {busy}");
-                }
+            (Mode::Plain, Some(busy)) if !busy.starts_with("Prüfe") && self.steps.due(busy, Instant::now()) => {
+                println!("Werkzeuge: {busy}");
             }
             _ => {}
         }
