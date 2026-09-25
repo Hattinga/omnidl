@@ -18,11 +18,8 @@ Ordner wird dabei mit ausgetauscht.
 
 **Installer:** `omnidl-<version>-x64.msi` doppelklicken. Braucht keine Administratorrechte,
 landet in `%LOCALAPPDATA%\Programs\omnidl`, im Startmenü und legt `omnidl-cli` in den PATH
-(neues Terminal öffnen). Oder mit winget:
-
-```powershell
-winget install Hattinga.omnidl
-```
+(neues Terminal öffnen). Da omnidl nicht signiert ist, warnt SmartScreen beim ersten Start:
+**Weitere Informationen → Trotzdem ausführen**.
 
 **Ohne Installation:** `omnidl.exe` (und bei Bedarf `omnidl-cli.exe`) in einen beliebigen
 Ordner legen und starten. Einstellungen und Werkzeuge liegen dann daneben.
