@@ -167,10 +167,13 @@ jobs:
           sudo ls -l /etc/default/omnidl-web
           systemd-analyze verify omnidl-web.service
           sudo systemctl start omnidl-web
-          sleep 5
-          systemctl status omnidl-web --no-pager || true
+          for i in $(seq 30); do curl -sf -o /dev/null http://127.0.0.1:8080/login && break; sleep 1; done
+          systemctl status omnidl-web --no-pager
           sudo journalctl -u omnidl-web --no-pager | tail -n 20
-          curl -sS -o /dev/null -w "web interface: HTTP %{http_code}\n" http://127.0.0.1:8080/ || true
+          # Without a password the service makes one and keeps it private.
+          test "$(sudo stat -c '%a %U' /var/lib/omnidl/web.toml)" = "600 omnidl"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/)" = 303
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/api/state)" = 401
           sudo apt-get remove -y omnidl-cli
           if systemctl is-active --quiet omnidl-web; then echo "::error::Dienst läuft nach dem Entfernen weiter"; exit 1; fi
           test ! -e /usr/bin/omnidl-cli
@@ -212,10 +215,14 @@ jobs:
             docker run --rm --platform "linux/$arch" "omnidl:$arch" omnidl-cli --version
           done
           docker run -d --name omnidl -p 8080:8080 -e OMNIDL_PASSWORD=test omnidl:amd64
-          sleep 5
+          for i in $(seq 30); do curl -sf -o /dev/null http://127.0.0.1:8080/login && break; sleep 1; done
           docker ps -a --filter name=omnidl
           docker logs omnidl
-          curl -sS -o /dev/null -w "web interface: HTTP %{http_code}\n" http://127.0.0.1:8080/ || true
+          # Log in with the password from the environment and read the list.
+          curl -sf -c cookies -o /dev/null -H 'x-omnidl: 1' -H 'content-type: application/json' \
+            -d '{"password":"test"}' http://127.0.0.1:8080/api/login
+          state=$(curl -sf -b cookies http://127.0.0.1:8080/api/state)
+          echo "${state:0:300}"
           docker rm -f omnidl
       - id: tags
         uses: docker/metadata-action@v6
