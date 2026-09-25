@@ -351,38 +351,76 @@ async fn install_from_zip(tools: &Tools, url: &str, name: &str, progress: &mut i
     Ok(())
 }
 
+/// Downloads `url` to `dest`. A dropped connection (common on the large
+/// ffmpeg archives) is retried twice, continuing where it stopped.
 async fn fetch(url: &str, dest: &Path, name: &str, progress: &mut impl FnMut(String)) -> Result<()> {
     progress(format!("Lade {name} …"));
-    let resp = util::http()
-        .get(url)
+    let tmp = dest.with_extension("part");
+    let mut part = Part { file: tokio::fs::File::create(&tmp).await?, got: 0, total: 0 };
+    let mut attempt = 1;
+    loop {
+        match fetch_part(url, &mut part, name, progress).await {
+            Ok(()) => break,
+            // An error answer from the server will not change on retry.
+            Err(e) if attempt < 3 && !e.downcast_ref::<reqwest::Error>().is_some_and(|e| e.is_status()) => {
+                attempt += 1;
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    let mut file = part.file;
+    tokio::io::AsyncWriteExt::flush(&mut file).await?;
+    drop(file);
+    let _ = tokio::fs::remove_file(dest).await;
+    tokio::fs::rename(&tmp, dest).await?;
+    Ok(())
+}
+
+/// A download in progress: the file written so far and the expected size.
+struct Part {
+    file: tokio::fs::File,
+    got: u64,
+    total: u64,
+}
+
+/// One attempt of `fetch`, asking only for what is still missing.
+async fn fetch_part(url: &str, part: &mut Part, name: &str, progress: &mut impl FnMut(String)) -> Result<()> {
+    use tokio::io::{AsyncSeekExt, AsyncWriteExt};
+    let mut request = util::http().get(url);
+    if part.got > 0 {
+        request = request.header(reqwest::header::RANGE, format!("bytes={}-", part.got));
+    }
+    let resp = request
         .send()
         .await
         .with_context(|| format!("{name}: Download fehlgeschlagen"))?
         .error_for_status()
         .with_context(|| format!("{name}: Server antwortete mit Fehler"))?;
-    let total = resp.content_length().unwrap_or(0);
-    let tmp = dest.with_extension("part");
-    let mut file = tokio::fs::File::create(&tmp).await?;
+    if part.got > 0 && resp.status() != reqwest::StatusCode::PARTIAL_CONTENT {
+        // The server sends everything again.
+        part.file.set_len(0).await?;
+        part.file.seek(std::io::SeekFrom::Start(0)).await?;
+        part.got = 0;
+    }
+    if part.got == 0 {
+        part.total = resp.content_length().unwrap_or(0);
+    }
     let mut stream = resp.bytes_stream();
-    let mut got: u64 = 0;
     let mut last = std::time::Instant::now();
     while let Some(chunk) = stream.next().await {
         let chunk = chunk?;
-        got += chunk.len() as u64;
-        tokio::io::AsyncWriteExt::write_all(&mut file, &chunk).await?;
+        part.file.write_all(&chunk).await?;
+        part.got += chunk.len() as u64;
         if last.elapsed().as_millis() > 200 {
             last = std::time::Instant::now();
-            progress(if total > 0 {
-                format!("Lade {name} … {:.0} %", got as f64 / total as f64 * 100.0)
+            progress(if part.total > 0 {
+                format!("Lade {name} … {:.0} %", part.got as f64 / part.total as f64 * 100.0)
             } else {
-                format!("Lade {name} … {}", util::fmt_bytes(got as f64))
+                format!("Lade {name} … {}", util::fmt_bytes(part.got as f64))
             });
         }
     }
-    tokio::io::AsyncWriteExt::flush(&mut file).await?;
-    drop(file);
-    let _ = tokio::fs::remove_file(dest).await;
-    tokio::fs::rename(&tmp, dest).await?;
     Ok(())
 }
 
@@ -612,6 +650,36 @@ mod tests {
         assert!(!dir.join("ffplay").exists() && !dir.join("ffmpeg.html").exists());
         let err = untar_xz(&archive, &dir, vec!["bin/fehlt".into()]).await.unwrap_err();
         assert!(err.to_string().contains("bin/fehlt"));
+    }
+
+    /// Bricht die Verbindung mitten im Download ab, setzt der zweite Versuch
+    /// dort fort, wo der erste aufgehört hat.
+    #[tokio::test]
+    async fn fetch_resumes_a_dropped_download() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/tool.zip", listener.local_addr().unwrap());
+        let server = tokio::spawn(async move {
+            let mut ranges = Vec::new();
+            for answer in [
+                "HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n0123",
+                "HTTP/1.1 206 Partial Content\r\nContent-Length: 6\r\nContent-Range: bytes 4-9/10\r\n\r\n456789",
+            ] {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut request = vec![0u8; 4096];
+                let n = socket.read(&mut request).await.unwrap();
+                let request = String::from_utf8_lossy(&request[..n]).to_lowercase();
+                ranges.push(request.lines().find(|l| l.starts_with("range:")).map(str::to_string));
+                socket.write_all(answer.as_bytes()).await.unwrap();
+                // Dropping the socket ends the first answer six bytes short.
+            }
+            ranges
+        });
+        let dest = temp("resume").join("tool.zip");
+        let mut messages = Vec::new();
+        fetch(&url, &dest, "tool", &mut |m| messages.push(m)).await.expect("zweiter Versuch klappt");
+        assert_eq!(std::fs::read(&dest).unwrap(), b"0123456789");
+        assert_eq!(server.await.unwrap(), vec![None, Some("range: bytes=4-".to_string())]);
     }
 
     #[test]
