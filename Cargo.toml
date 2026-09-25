@@ -27,7 +27,7 @@ required-features = ["cli"]
 [features]
 default = ["gui", "cli"]
 gui = ["dep:eframe", "dep:egui", "dep:rfd"]
-cli = ["dep:clap", "dep:axum", "dep:tokio-stream", "dep:getrandom", "dep:crossterm", "dep:unicode-width"]
+cli = ["dep:clap", "dep:axum", "dep:tokio-stream", "dep:getrandom", "dep:crossterm", "dep:unicode-width", "dep:if-addrs"]
 
 [dependencies]
 anyhow = "1.0.104"
@@ -40,6 +40,7 @@ eframe = { version = "0.36.2", default-features = false, features = ["default_fo
 egui = { version = "0.36.2", optional = true }
 futures-util = "0.3.34"
 getrandom = { version = "0.4.3", optional = true }
+if-addrs = { version = "0.15.0", optional = true }
 lofty = "0.25.4"
 regex = "1.13.1"
 # TLS backend per platform, see the target sections below.
@@ -49,7 +50,7 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 sha2 = "0.10.9"
 strsim = "0.11.1"
-tokio = { version = "1.53.1", features = ["rt-multi-thread", "process", "sync", "io-util", "macros", "time", "net", "signal"] }
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "process", "sync", "io-util", "macros", "time", "net", "signal", "fs"] }
 tokio-stream = { version = "0.1.19", features = ["sync"], optional = true }
 tokio-util = "0.7.19"
 toml = "1.1.6"
@@ -88,6 +89,9 @@ tar = { version = "0.4.46", default-features = false }
 # Tests build .tar.xz archives.
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 lzma-rust2 = { version = "0.21.0", default-features = false, features = ["std", "xz", "encoder"] }
+
+[dev-dependencies]
+tower = { version = "0.5.3", features = ["util"] }
 
 [build-dependencies]
 embed-resource = "3.0.11"
