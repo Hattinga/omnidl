@@ -202,11 +202,8 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        let home = std::env::var_os("USERPROFILE")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("."));
         Self {
-            download_dir: home.join("Downloads").join("omnidl"),
+            download_dir: downloads_dir(&env_path, std::env::consts::OS).join("omnidl"),
             parallel: 4,
             format: Format::Mp4,
             last_video: Format::Mp4,
@@ -276,13 +273,61 @@ impl Config {
     }
 }
 
-/// Portable base directory: next to the .exe. During development (exe inside
-/// `target/{debug,release}`) the Cargo project root is used so `bin/` is shared.
+/// A non-empty environment variable as a path.
+fn env_path(key: &str) -> Option<PathBuf> {
+    std::env::var_os(key).filter(|v| !v.is_empty()).map(PathBuf::from)
+}
+
+/// The user's download folder: `~/Downloads`, on Linux the localized one from
+/// `user-dirs.dirs` (`~/Téléchargements`) when set.
+fn downloads_dir(var: &dyn Fn(&str) -> Option<PathBuf>, os: &str) -> PathBuf {
+    let home = var(if os == "windows" { "USERPROFILE" } else { "HOME" }).unwrap_or_else(|| PathBuf::from("."));
+    if os == "linux" {
+        let config = var("XDG_CONFIG_HOME").unwrap_or_else(|| home.join(".config"));
+        let listed = std::fs::read_to_string(config.join("user-dirs.dirs")).ok();
+        if let Some(dir) = listed.and_then(|s| xdg_download_dir(&s, &home)) {
+            return dir;
+        }
+    }
+    home.join("Downloads")
+}
+
+/// `XDG_DOWNLOAD_DIR="$HOME/Downloads"` from `user-dirs.dirs`. A value of just
+/// `$HOME` means the folder is switched off.
+fn xdg_download_dir(listing: &str, home: &Path) -> Option<PathBuf> {
+    let value = listing.lines().find_map(|l| l.trim().strip_prefix("XDG_DOWNLOAD_DIR="))?.trim().trim_matches('"');
+    let dir = match value.strip_prefix("$HOME") {
+        Some(rest) => home.join(rest.trim_start_matches('/')),
+        None if value.starts_with('/') => PathBuf::from(value),
+        None => return None,
+    };
+    (dir != home).then_some(dir)
+}
+
+/// Where omnidl keeps its tools, settings and queue:
+///
+/// - `OMNIDL_HOME` if set (servers, containers);
+/// - during development (exe inside `target/{debug,release}`) the Cargo
+///   project root, so `bin/` is shared;
+/// - Windows: next to the .exe (portable);
+/// - macOS: `~/Library/Application Support/omnidl`;
+/// - Linux and other Unix: `$XDG_DATA_HOME/omnidl`, else `~/.local/share/omnidl`.
 pub fn base_dir() -> PathBuf {
     let exe_dir = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(PathBuf::from))
         .unwrap_or_else(|| PathBuf::from("."));
+    let dir = locate_base(&exe_dir, &env_path, std::env::consts::OS);
+    if dir != exe_dir {
+        let _ = std::fs::create_dir_all(&dir);
+    }
+    dir
+}
+
+fn locate_base(exe_dir: &Path, var: &dyn Fn(&str) -> Option<PathBuf>, os: &str) -> PathBuf {
+    if let Some(dir) = var("OMNIDL_HOME") {
+        return dir;
+    }
     let profile = exe_dir.file_name().and_then(|n| n.to_str()).unwrap_or("");
     let parent = exe_dir.parent();
     if matches!(profile, "debug" | "release")
@@ -292,7 +337,14 @@ pub fn base_dir() -> PathBuf {
             return root.to_path_buf();
         }
     }
-    exe_dir
+    let home = var("HOME");
+    match os {
+        "windows" => exe_dir.to_path_buf(),
+        "macos" => home.map_or_else(|| exe_dir.to_path_buf(), |h| h.join("Library/Application Support/omnidl")),
+        _ => var("XDG_DATA_HOME")
+            .or_else(|| home.map(|h| h.join(".local/share")))
+            .map_or_else(|| exe_dir.to_path_buf(), |d| d.join("omnidl")),
+    }
 }
 
 fn config_path() -> PathBuf {
@@ -309,6 +361,9 @@ pub fn remove_app_files(base: &Path) {
         let path = base.join(name);
         let _ = if path.is_dir() { std::fs::remove_dir_all(&path) } else { std::fs::remove_file(&path) };
     }
+    // The data folder itself, where nothing else is left in it.
+    #[cfg(unix)]
+    let _ = std::fs::remove_dir(base);
 }
 
 #[cfg(test)]
@@ -331,6 +386,48 @@ mod tests {
             .collect();
         left.sort();
         assert_eq!(left, vec!["fremd.txt", "omnidl.exe"]);
+    }
+
+    fn env<'a>(vars: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<PathBuf> + 'a {
+        move |k| vars.iter().find(|(n, _)| *n == k).map(|(_, v)| PathBuf::from(v))
+    }
+
+    #[test]
+    fn base_dir_per_platform() {
+        let exe = Path::new("/opt/omnidl");
+        let home = [("HOME", "/home/a")];
+        assert_eq!(locate_base(exe, &env(&[]), "windows"), exe, "Windows bleibt portabel");
+        assert_eq!(locate_base(exe, &env(&home), "macos"), Path::new("/home/a/Library/Application Support/omnidl"));
+        assert_eq!(locate_base(exe, &env(&home), "linux"), Path::new("/home/a/.local/share/omnidl"));
+        let xdg = [("HOME", "/home/a"), ("XDG_DATA_HOME", "/data")];
+        assert_eq!(locate_base(exe, &env(&xdg), "linux"), Path::new("/data/omnidl"));
+        assert_eq!(locate_base(exe, &env(&[]), "linux"), exe, "ohne HOME neben dem Programm");
+        for os in ["windows", "macos", "linux"] {
+            let vars = [("HOME", "/home/a"), ("OMNIDL_HOME", "/srv/omnidl")];
+            assert_eq!(locate_base(exe, &env(&vars), os), Path::new("/srv/omnidl"), "OMNIDL_HOME gilt überall");
+        }
+        let dev = Path::new("/src/omnidl/target/debug");
+        assert_eq!(locate_base(dev, &env(&home), "linux"), Path::new("/src/omnidl"), "Entwicklung nutzt das Projekt");
+    }
+
+    #[test]
+    fn download_dir_per_platform() {
+        let win = [("USERPROFILE", "C:/Users/a")];
+        assert_eq!(downloads_dir(&env(&win), "windows"), Path::new("C:/Users/a/Downloads"));
+        let mac = [("HOME", "/Users/a")];
+        assert_eq!(downloads_dir(&env(&mac), "macos"), Path::new("/Users/a/Downloads"));
+        let linux = [("HOME", "/home/a"), ("XDG_CONFIG_HOME", "/nirgends")];
+        assert_eq!(downloads_dir(&env(&linux), "linux"), Path::new("/home/a/Downloads"));
+    }
+
+    #[test]
+    fn reads_the_localized_download_folder() {
+        let home = Path::new("/home/a");
+        let listing = "# user-dirs\nXDG_DESKTOP_DIR=\"$HOME/Bureau\"\nXDG_DOWNLOAD_DIR=\"$HOME/Téléchargements\"\n";
+        assert_eq!(xdg_download_dir(listing, home), Some(PathBuf::from("/home/a/Téléchargements")));
+        assert_eq!(xdg_download_dir("XDG_DOWNLOAD_DIR=\"/mnt/dl\"", home), Some(PathBuf::from("/mnt/dl")));
+        assert_eq!(xdg_download_dir("XDG_DOWNLOAD_DIR=\"$HOME/\"", home), None, "abgeschaltet");
+        assert_eq!(xdg_download_dir("XDG_MUSIC_DIR=\"$HOME/Musik\"", home), None);
     }
 
     fn temp(name: &str) -> PathBuf {

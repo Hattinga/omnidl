@@ -59,7 +59,7 @@ pub fn build_args(tools: &Tools, req: &Request) -> Vec<String> {
         "--fragment-retries".into(),
         "10".into(),
         "--ffmpeg-location".into(),
-        tools.bin.display().to_string(),
+        tools.ffmpeg_dir().display().to_string(),
         "--progress-template".into(),
         format!(
             "download:{P_PROGRESS}%(progress.downloaded_bytes)s %(progress.total_bytes)s \
