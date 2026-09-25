@@ -22,7 +22,7 @@ Ins Anwendungsmenü aufnehmen (nur für dich, ohne root)
 Danach steht omnidl im Menü und der Browser kann es über omnidl:// starten. Dasselbe
 erledigt:
 
-  curl -fsSL https://github.com/Hattinga/omnidl/releases/latest/download/install.sh | sh -s -- --desktop
+  curl -fsSL https://github.com/Hattinga/hattis-projekte/releases/latest/download/install.sh | sh -s -- --desktop
 
 Updates: omnidl meldet neue Versionen selbst und tauscht dabei auch omnidl-cli im
 selben Ordner aus. Liegen die Programme in einem Ordner ohne Schreibrecht (etwa
@@ -50,4 +50,4 @@ Das Paket omnidl-cli_<version>_<amd64|arm64>.deb bringt einen systemd-Dienst mit
 
 Eigenes Passwort, Adresse und Zielordner: /etc/default/omnidl-web
 
-Mehr: https://github.com/Hattinga/omnidl
+Mehr: https://github.com/Hattinga/hattis-projekte/tree/main/omnidl

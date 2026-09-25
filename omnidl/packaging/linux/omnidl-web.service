@@ -3,7 +3,7 @@
 # Settings (address, download folder, password): /etc/default/omnidl-web
 [Unit]
 Description=omnidl web interface
-Documentation=https://github.com/Hattinga/omnidl
+Documentation=https://github.com/Hattinga/hattis-projekte/tree/main/omnidl
 Wants=network-online.target
 After=network-online.target
 

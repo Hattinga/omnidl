@@ -26,8 +26,8 @@
 
     <Icon Id="omnidl.ico" SourceFile="$(sys.SOURCEFILEDIR)..\assets\omnidl.ico" />
     <Property Id="ARPPRODUCTICON" Value="omnidl.ico" />
-    <Property Id="ARPURLINFOABOUT" Value="https://github.com/Hattinga/omnidl" />
-    <Property Id="ARPHELPLINK" Value="https://github.com/Hattinga/omnidl#readme" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/Hattinga/hattis-projekte/tree/main/omnidl" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/Hattinga/hattis-projekte/tree/main/omnidl#readme" />
     <Property Id="ARPNOMODIFY" Value="1" />
     <Property Id="ARPNOREPAIR" Value="1" />
 

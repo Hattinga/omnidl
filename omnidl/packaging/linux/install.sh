@@ -1,7 +1,7 @@
 #!/bin/sh
 # Installs omnidl from GitHub releases on Linux (x86_64, aarch64).
 #
-#   curl -fsSL https://github.com/Hattinga/omnidl/releases/latest/download/install.sh | sh
+#   curl -fsSL https://github.com/Hattinga/hattis-projekte/releases/latest/download/install.sh | sh
 #   ... | sh -s -- --desktop          also the desktop app, with menu entry and omnidl:// handler
 #   ... | sudo sh                     for all users, into /usr/local/bin
 #
@@ -14,7 +14,7 @@
 # installed. Running it again updates in place.
 set -eu
 
-REPO=Hattinga/omnidl
+REPO=Hattinga/hattis-projekte
 desktop=0
 version=
 bindir=

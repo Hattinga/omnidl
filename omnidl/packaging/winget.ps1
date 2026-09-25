@@ -7,7 +7,7 @@
 param([Parameter(Mandatory)][string]$Version)
 $ErrorActionPreference = "Stop"
 
-$repo = "Hattinga/omnidl"
+$repo = "Hattinga/hattis-projekte"
 $id = "Hattinga.omnidl"
 $msi = "omnidl-$Version-x64.msi"
 $url = "https://github.com/$repo/releases/download/v$Version/$msi"

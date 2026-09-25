@@ -1,6 +1,6 @@
 # omnidl installieren
 
-Alle Dateien liegen unter [Releases](https://github.com/Hattinga/omnidl/releases/latest), jede
+Alle Dateien liegen unter [Releases](https://github.com/Hattinga/hattis-projekte/releases/latest), jede
 mit einer `.sha256`-Prüfsumme daneben. Es gibt zwei Programme:
 
 - **omnidl** – die Desktop-App mit Fenster.
@@ -31,7 +31,7 @@ Einstellungen landen daneben:
 
 ```powershell
 $v = "0.3.0"
-Invoke-WebRequest "https://github.com/Hattinga/omnidl/releases/download/v$v/omnidl-cli-$v-windows-x86_64.zip" -OutFile omnidl-cli.zip
+Invoke-WebRequest "https://github.com/Hattinga/hattis-projekte/releases/download/v$v/omnidl-cli-$v-windows-x86_64.zip" -OutFile omnidl-cli.zip
 Expand-Archive omnidl-cli.zip C:\omnidl
 C:\omnidl\omnidl-cli.exe serve --listen 0.0.0.0:8080 --password geheim
 ```
@@ -53,7 +53,7 @@ xattr -dr com.apple.quarantine /Applications/omnidl.app
 Terminal-Programm:
 
 ```sh
-curl -fsSL https://github.com/Hattinga/omnidl/releases/latest/download/omnidl-cli-macos-universal -o omnidl-cli
+curl -fsSL https://github.com/Hattinga/hattis-projekte/releases/latest/download/omnidl-cli-macos-universal -o omnidl-cli
 chmod +x omnidl-cli && sudo mv omnidl-cli /usr/local/bin/
 ```
 
@@ -75,7 +75,7 @@ Updates kommen dann über neue `.deb`-Dateien, nicht über die App.
 `omnidl://` für die Browser-Erweiterung; die App aktualisiert sich dort selbst:
 
 ```sh
-curl -fsSL https://github.com/Hattinga/omnidl/releases/latest/download/install.sh | sh -s -- --desktop
+curl -fsSL https://github.com/Hattinga/hattis-projekte/releases/latest/download/install.sh | sh -s -- --desktop
 ```
 
 Oder `omnidl-<version>-linux-x86_64.tar.gz` entpacken und `./omnidl` starten (README.txt im
@@ -98,7 +98,7 @@ eines und zeigt es im Protokoll: `journalctl -u omnidl-web`.
 Andere Distributionen, nur das Terminal-Programm:
 
 ```sh
-curl -fsSL https://github.com/Hattinga/omnidl/releases/latest/download/install.sh | sudo sh
+curl -fsSL https://github.com/Hattinga/hattis-projekte/releases/latest/download/install.sh | sudo sh
 ```
 
 ## Docker

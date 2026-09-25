@@ -1,14 +1,20 @@
-name: Release
+name: omnidl Release
 
-# A tag like v0.3.0 (matching Cargo.toml) builds every platform, publishes a
-# GitHub release and pushes the Docker image to ghcr.io/hattinga/omnidl.
-# Pushes to build/** branches, pull requests that touch packaging and manual
-# runs build exactly the same files as workflow artifacts and publish nothing.
+# A tag like v0.3.0 (matching omnidl/Cargo.toml) builds every platform,
+# publishes a GitHub release and pushes the Docker image to
+# ghcr.io/hattinga/omnidl. Pushes to build/** branches, pull requests that
+# touch packaging and manual runs build exactly the same files as workflow
+# artifacts and publish nothing.
 #
-# The in-app updater reads the newest release and needs, each with a .sha256:
-# omnidl.exe (Windows; 0.2 clients look for exactly this name),
-# omnidl-macos-universal, omnidl-linux-x86_64, omnidl-linux-aarch64 and the
-# matching omnidl-cli* programs.
+# The in-app updater, install.sh and the README badge read the repository's
+# "latest" release, so that one must always be an omnidl release: omnidl keeps
+# plain vX.Y.Z tags (0.2/0.3 clients parse exactly those) and is published
+# with --latest; the other projects in this repository use prefixed tags
+# (clipd-vX.Y.Z) and publish with --latest=false.
+#
+# The updater needs, each with a .sha256: omnidl.exe (Windows; 0.2 clients
+# look for exactly this name), omnidl-macos-universal, omnidl-linux-x86_64,
+# omnidl-linux-aarch64 and the matching omnidl-cli* programs.
 
 on:
   push:
@@ -16,13 +22,13 @@ on:
     branches: ["build/**"]
   pull_request:
     paths:
-      - ".github/workflows/release.yml"
-      - "packaging/**"
-      - "installer/**"
-      - "Dockerfile"
-      - ".dockerignore"
-      - "build.rs"
-      - "src/update.rs"
+      - ".github/workflows/omnidl-release.yml"
+      - "omnidl/packaging/**"
+      - "omnidl/installer/**"
+      - "omnidl/Dockerfile"
+      - "omnidl/.dockerignore"
+      - "omnidl/build.rs"
+      - "omnidl/src/update.rs"
   workflow_dispatch:
 
 permissions:
@@ -34,6 +40,10 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    working-directory: omnidl
 
 jobs:
   meta:
@@ -67,6 +77,8 @@ jobs:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: omnidl
       - name: WiX 5
         run: dotnet tool install --global wix --version 5.0.2
       - name: omnidl.exe, omnidl-cli.exe, MSI and zip
@@ -80,7 +92,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: windows
-          path: dist/
+          path: omnidl/dist/
           if-no-files-found: error
           retention-days: 14
 
@@ -94,6 +106,8 @@ jobs:
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: omnidl
       - name: Universal app, DMG and CLI archive
         run: sh packaging/macos/bundle.sh
       - name: Smoke test
@@ -111,7 +125,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: macos
-          path: dist/
+          path: omnidl/dist/
           if-no-files-found: error
           retention-days: 14
 
@@ -139,6 +153,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
+          workspaces: omnidl
           key: ${{ matrix.arch }}
       - uses: taiki-e/install-action@v2
         with:
@@ -185,7 +200,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: linux-${{ matrix.arch }}
-          path: dist/
+          path: omnidl/dist/
           if-no-files-found: error
           retention-days: 14
 
@@ -201,7 +216,7 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           pattern: linux-*
-          path: artifacts
+          path: omnidl/artifacts
       - name: Programs for the image
         run: |
           install -D -m 755 artifacts/linux-x86_64/omnidl-cli-linux-x86_64 dist/docker/amd64/omnidl-cli
@@ -243,7 +258,7 @@ jobs:
       - name: Build (and on tags push) linux/amd64 + linux/arm64
         uses: docker/build-push-action@v7
         with:
-          context: .
+          context: omnidl
           target: prebuilt
           platforms: linux/amd64,linux/arm64
           push: ${{ needs.meta.outputs.publish == 'true' }}
@@ -261,7 +276,7 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           pattern: "{windows,macos,linux-*}"
-          path: dist
+          path: omnidl/dist
           merge-multiple: true
       - name: Installer script and a .sha256 for every file
         run: |
@@ -281,11 +296,11 @@ jobs:
         with:
           name: release
           path: |
-            dist/
-            notes.md
+            omnidl/dist/
+            omnidl/notes.md
           retention-days: 14
       - name: Publish
         if: needs.meta.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --title "omnidl $GITHUB_REF_NAME" --notes-file notes.md
+        run: gh release create "$GITHUB_REF_NAME" dist/* --latest --title "omnidl $GITHUB_REF_NAME" --notes-file notes.md

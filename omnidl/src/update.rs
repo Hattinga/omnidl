@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
-pub const REPO: &str = "Hattinga/omnidl";
+pub const REPO: &str = "Hattinga/hattis-projekte";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The terminal program; it is not updated on its own, only next to the app.
 const CLI_NAME: &str = "omnidl-cli";
