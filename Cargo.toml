@@ -1,6 +1,6 @@
 [package]
 name = "omnidl"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 description = "Desktop-Downloader für YouTube, TikTok, Spotify und rund 1800 weitere Seiten"
 build = "build.rs"

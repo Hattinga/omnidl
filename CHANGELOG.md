@@ -1,5 +1,26 @@
 # Änderungen
 
+## 0.3.0
+
+- **macOS und Linux.** Die Desktop-App läuft jetzt auch auf macOS 11+ (Apple Silicon und
+  Intel, als .dmg) und auf Linux x86_64/aarch64 (.deb, .tar.gz oder Installationsskript),
+  jeweils mit der Systemschrift. Die Werkzeuge kommen für jedes System passend; ein schon
+  installiertes yt-dlp oder ffmpeg (Homebrew, apt) wird mitbenutzt. Einstellungen liegen
+  unter `~/Library/Application Support/omnidl` bzw. `~/.local/share/omnidl`.
+- **Web-Interface für Server und NAS.** `omnidl-cli serve` bringt omnidl in den Browser,
+  auch aufs Handy: Links einfügen, Fortschritt live sehen, fertige Dateien herunterladen.
+  Mit Passwort, im Heimnetz, hinter einem Reverse Proxy, als systemd-Dienst (Ubuntu Server,
+  Debian) oder als Docker-Image `ghcr.io/hattinga/omnidl` (amd64 und arm64).
+- **omnidl-cli** für das Terminal: `omnidl-cli get <Link>` lädt mit Live-Anzeige,
+  `--json` liefert Ereignisse für Skripte, `omnidl-cli tools update` holt ein neues yt-dlp.
+  Unter Windows legt der Installer `omnidl-cli` in den PATH; für Windows Server gibt es ein
+  eigenes Zip.
+- Updates holen die passende Datei fürs eigene System und tauschen `omnidl-cli` gleich mit
+  aus.
+- Wartende und geplante Downloads zeigen gleich ihren echten Titel statt des Links.
+- Abgebrochene Werkzeug-Downloads machen dort weiter, wo sie aufgehört haben.
+- Schnellerer Start.
+
 ## 0.2.0
 
 - **Warteschlange übersteht Neustarts.** Was beim Schließen, bei einem Absturz oder
