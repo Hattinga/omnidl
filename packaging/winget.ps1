@@ -1,4 +1,4 @@
-# Writes the winget manifests for a published release into packaging/winget/<version>/.
+﻿# Writes the winget manifests for a published release into packaging/winget/<version>/.
 # Submit them with `wingetcreate submit packaging/winget/<version>` or as a pull
 # request to https://github.com/microsoft/winget-pkgs (manifests/h/Hattinga/omnidl/<version>/).
 #
@@ -42,6 +42,8 @@ InstallModes:
 UpgradeBehavior: install
 Protocols:
 - omnidl
+Commands:
+- omnidl-cli
 Installers:
 - Architecture: x64
   InstallerUrl: $url

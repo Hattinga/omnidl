@@ -1,0 +1,10 @@
+#!/bin/sh
+# Downloads and tools in /var/lib/omnidl stay, as does the user "omnidl";
+# remove them by hand if wanted:  sudo rm -rf /var/lib/omnidl && sudo userdel omnidl
+set -e
+
+if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload >/dev/null 2>&1 || true
+fi
+
+exit 0

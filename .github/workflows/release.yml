@@ -1,46 +1,284 @@
 name: Release
 
-# Push a tag like v0.3.0 (matching Cargo.toml) to build and publish a release.
-# The in-app updater reads the newest release: it needs omnidl.exe and its .sha256.
+# A tag like v0.3.0 (matching Cargo.toml) builds every platform, publishes a
+# GitHub release and pushes the Docker image to ghcr.io/hattinga/omnidl.
+# Pushes to build/** branches, pull requests that touch packaging and manual
+# runs build exactly the same files as workflow artifacts and publish nothing.
+#
+# The in-app updater reads the newest release and needs, each with a .sha256:
+# omnidl.exe (Windows; 0.2 clients look for exactly this name),
+# omnidl-macos-universal, omnidl-linux-x86_64, omnidl-linux-aarch64 and the
+# matching omnidl-cli* programs.
+
 on:
   push:
     tags: ["v*"]
+    branches: ["build/**"]
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - "packaging/**"
+      - "installer/**"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "build.rs"
+      - "src/update.rs"
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  release:
-    runs-on: windows-latest
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      publish: ${{ steps.version.outputs.publish }}
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Tag matches Cargo.toml
-        shell: pwsh
+      - uses: actions/checkout@v7
+      - id: version
+        name: Version from Cargo.toml
         run: |
-          $v = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
-          if ("v$v" -ne "${{ github.ref_name }}") { throw "Tag ${{ github.ref_name }} passt nicht zu Version $v in Cargo.toml" }
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
+              echo "::error::Tag $GITHUB_REF_NAME passt nicht zu Version $version in Cargo.toml"
+              exit 1
+            fi
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "omnidl $version, veröffentlichen: $([[ "$GITHUB_REF" == refs/tags/* ]] && echo ja || echo nein)"
 
+  windows:
+    needs: meta
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-
-      - name: WiX
+      - name: WiX 5
         run: dotnet tool install --global wix --version 5.0.2
-
-      - name: Build exe, installer and checksums
+      - name: omnidl.exe, omnidl-cli.exe, MSI and zip
         shell: pwsh
-        run: ./packaging/release.ps1
-
-      - name: Release notes from CHANGELOG.md
+        run: ./packaging/release.ps1 ${{ needs.meta.outputs.publish != 'true' && '-SkipTests' || '' }}
+      - name: Smoke test
         shell: pwsh
         run: |
-          $v = "${{ github.ref_name }}".TrimStart("v")
-          $section = ((Get-Content CHANGELOG.md -Raw) -split '(?m)^## ') | Where-Object { $_.StartsWith($v) } | Select-Object -First 1
-          $notes = if ($section) { ($section -split "`n", 2)[1].Trim() } else { "omnidl $v" }
-          Set-Content -Encoding utf8 notes.md $notes
+          ./dist/omnidl-cli.exe --version
+          if ($LASTEXITCODE) { throw "omnidl-cli.exe startet nicht" }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
 
+  macos:
+    needs: meta
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - name: Universal app, DMG and CLI archive
+        run: sh packaging/macos/bundle.sh
+      - name: Smoke test
+        run: |
+          ./dist/omnidl-cli-macos-universal --version
+          if arch -x86_64 /usr/bin/true 2>/dev/null; then arch -x86_64 ./dist/omnidl-cli-macos-universal --version; fi
+          codesign --verify --verbose ./dist/omnidl-macos-universal
+          hdiutil verify dist/omnidl-*-macos.dmg
+          mnt=$(mktemp -d)
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" dist/omnidl-*-macos.dmg
+          ls -l "$mnt"
+          codesign --verify --deep --strict "$mnt/omnidl.app"
+          plutil -p "$mnt/omnidl.app/Contents/Info.plist"
+          hdiutil detach "$mnt"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  linux:
+    needs: meta
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Built on 22.04 so the programs also run on older systems (glibc 2.35).
+          - arch: x86_64
+            runner: ubuntu-22.04
+          - arch: aarch64
+            runner: ubuntu-22.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      # The build itself needs no system libraries (rustls; X11, Wayland and
+      # OpenGL are loaded at run time). This only checks the desktop entry.
+      - name: Tools for the checks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends desktop-file-utils
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.arch }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deb
+      - name: Build
+        run: |
+          cargo build --release --locked --bin omnidl
+          # The terminal program without any graphics libraries.
+          cargo build --release --locked --no-default-features --features cli --bin omnidl-cli
+      - name: Archive, .deb packages, updater files
+        run: sh packaging/linux/package.sh
+      - name: Check the programs and packages
+        run: |
+          file dist/omnidl-linux-${{ matrix.arch }} dist/omnidl-cli-linux-${{ matrix.arch }}
+          echo "omnidl-cli needs:"; ldd dist/omnidl-cli-linux-${{ matrix.arch }}
+          ./dist/omnidl-cli-linux-${{ matrix.arch }} --version
+          tar -tzvf dist/omnidl-*-linux-${{ matrix.arch }}.tar.gz
+          for deb in dist/*.deb; do dpkg-deb --info "$deb"; dpkg-deb --contents "$deb"; done
+          desktop-file-validate packaging/linux/omnidl.desktop
+      - name: Install, start and remove the omnidl-cli package
+        run: |
+          sudo apt-get install -y ./dist/omnidl-cli_*.deb
+          omnidl-cli --version
+          getent passwd omnidl
+          sudo ls -ld /var/lib/omnidl /var/lib/omnidl/downloads
+          sudo ls -l /etc/default/omnidl-web
+          systemd-analyze verify omnidl-web.service
+          sudo systemctl start omnidl-web
+          sleep 5
+          systemctl status omnidl-web --no-pager || true
+          sudo journalctl -u omnidl-web --no-pager | tail -n 20
+          curl -sS -o /dev/null -w "web interface: HTTP %{http_code}\n" http://127.0.0.1:8080/ || true
+          sudo apt-get remove -y omnidl-cli
+          if systemctl is-active --quiet omnidl-web; then echo "::error::Dienst läuft nach dem Entfernen weiter"; exit 1; fi
+          test ! -e /usr/bin/omnidl-cli
+          sudo apt-get install -y ./dist/omnidl_*.deb
+          ldd /usr/bin/omnidl
+          test -f /usr/share/applications/omnidl.desktop
+          test -f /usr/share/icons/hicolor/512x512/apps/omnidl.png
+          sudo apt-get remove -y omnidl
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-${{ matrix.arch }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  docker:
+    needs: [meta, linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: linux-*
+          path: artifacts
+      - name: Programs for the image
+        run: |
+          install -D -m 755 artifacts/linux-x86_64/omnidl-cli-linux-x86_64 dist/docker/amd64/omnidl-cli
+          install -D -m 755 artifacts/linux-aarch64/omnidl-cli-linux-aarch64 dist/docker/arm64/omnidl-cli
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Smoke test (amd64, arm64)
+        run: |
+          for arch in amd64 arm64; do
+            docker buildx build --platform "linux/$arch" --target prebuilt --load -t "omnidl:$arch" .
+            docker run --rm --platform "linux/$arch" "omnidl:$arch" omnidl-cli --version
+          done
+          docker run -d --name omnidl -p 8080:8080 -e OMNIDL_PASSWORD=test omnidl:amd64
+          sleep 5
+          docker ps -a --filter name=omnidl
+          docker logs omnidl
+          curl -sS -o /dev/null -w "web interface: HTTP %{http_code}\n" http://127.0.0.1:8080/ || true
+          docker rm -f omnidl
+      - id: tags
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/hattinga/omnidl
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ needs.meta.outputs.publish == 'true' }}
+            type=ref,event=branch
+            type=ref,event=pr
+      - if: needs.meta.outputs.publish == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build (and on tags push) linux/amd64 + linux/arm64
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: prebuilt
+          platforms: linux/amd64,linux/arm64
+          push: ${{ needs.meta.outputs.publish == 'true' }}
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: ${{ steps.tags.outputs.labels }}
+
+  release:
+    needs: [meta, windows, macos, linux, docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: "{windows,macos,linux-*}"
+          path: dist
+          merge-multiple: true
+      - name: Installer script and a .sha256 for every file
+        run: |
+          cp packaging/linux/install.sh dist/
+          cd dist
+          rm -f ./*.sha256
+          for f in *; do sha256sum "$f" > "$f.sha256"; done
+          ls -l
+      - name: Release notes from CHANGELOG.md
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '/^## / { if (found) exit; found = ($2 == v); next } found' CHANGELOG.md > notes.md
+          grep -q '[^[:space:]]' notes.md || echo "omnidl $VERSION" > notes.md
+          cat notes.md
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release
+          path: |
+            dist/
+            notes.md
+          retention-days: 14
       - name: Publish
-        shell: pwsh
+        if: needs.meta.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" (Get-ChildItem dist).FullName --title "omnidl ${{ github.ref_name }}" --notes-file notes.md
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "omnidl $GITHUB_REF_NAME" --notes-file notes.md

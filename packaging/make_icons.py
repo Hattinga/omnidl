@@ -1,7 +1,8 @@
 """Renders the omnidl icon (blue rounded square, white download arrow).
 
-Writes the Windows icon, the browser extension icons and the raw RGBA window
-icon the app embeds. Needs Pillow. Run from the repository root:
+Writes the Windows icon, the browser extension icons, the raw RGBA window
+icon the app embeds and the master for the macOS icon (packaging/macos/bundle.sh
+turns it into omnidl.icns). Needs Pillow. Run from the repository root:
 
     python packaging/make_icons.py
 """
@@ -54,6 +55,14 @@ def main() -> None:
     icons.mkdir(parents=True, exist_ok=True)
     for n in (16, 32, 48, 128):
         sized(n).save(icons / f"{n}.png")
+
+    # macOS draws app icons on an 824 px body inside the 1024 px canvas; ours
+    # fills 928 px, so shrink it to match the Dock and Launchpad neighbours.
+    body = S - 2 * 48
+    n = round(S * 824 / body)
+    mac = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    mac.paste(sized(n), ((S - n) // 2, (S - n) // 2))
+    mac.save(ROOT / "packaging" / "macos" / "icon-1024.png", optimize=True)
     print("Icons geschrieben.")
 
 

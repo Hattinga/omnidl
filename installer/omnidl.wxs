@@ -2,9 +2,12 @@
   omnidl installer: per user, no administrator rights, into
   %LOCALAPPDATA%\Programs\omnidl. The app downloads its tools into that folder
   and replaces its own exe when updating, so it has to be writable.
+  omnidl-cli.exe sits next to it; the folder goes onto the user's PATH so
+  `omnidl-cli` works in any new terminal.
 
   Build (see packaging/release.ps1):
-    wix build installer/omnidl.wxs -arch x64 -d Version=0.2.0 -d Exe=target/release/omnidl.exe -o dist/omnidl-0.2.0-x64.msi
+    wix build installer/omnidl.wxs -arch x64 -d Version=0.3.0 -d Exe=target/release/omnidl.exe
+      -d CliExe=target/release/omnidl-cli.exe -o dist/omnidl-0.3.0-x64.msi
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package
@@ -50,6 +53,15 @@
       </RegistryKey>
     </Component>
 
+    <!-- The terminal program, on the user's PATH (HKCU\Environment; taken out
+         again on uninstall). Its own component so the App component stays as
+         it was in 0.2. -->
+    <Component Id="Cli" Directory="INSTALLFOLDER" Guid="3B2B6D5B-3882-4E03-9768-A0CC08C484F5">
+      <RegistryValue Root="HKCU" Key="Software\omnidl" Name="Cli" Type="integer" Value="1" KeyPath="yes" />
+      <File Id="omnidl_cli.exe" Source="$(var.CliExe)" Name="omnidl-cli.exe" />
+      <Environment Id="UserPath" Name="PATH" Value="[INSTALLFOLDER]" Part="last" Action="set" System="no" Permanent="no" />
+    </Component>
+
     <StandardDirectory Id="ProgramMenuFolder">
       <Component Id="StartMenu">
         <Shortcut
@@ -65,6 +77,7 @@
 
     <Feature Id="Main">
       <ComponentRef Id="App" />
+      <ComponentRef Id="Cli" />
       <ComponentRef Id="StartMenu" />
     </Feature>
 

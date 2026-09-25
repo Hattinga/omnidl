@@ -1,0 +1,20 @@
+# omnidl web interface:  docker compose up -d  →  http://<host>:8080
+# The first start loads yt-dlp, ffmpeg & co. into the data volume (~500 MB).
+services:
+  omnidl:
+    image: ghcr.io/hattinga/omnidl:latest
+    # build: .                 # or build it from this checkout
+    container_name: omnidl
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Without it omnidl makes one up and prints it: docker compose logs omnidl
+      OMNIDL_PASSWORD: "bitte-ändern"
+    volumes:
+      - omnidl-data:/data
+      # Must be writable for the container's user: sudo chown 10001:10001 downloads
+      - ./downloads:/downloads
+
+volumes:
+  omnidl-data:

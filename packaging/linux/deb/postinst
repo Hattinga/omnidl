@@ -1,0 +1,37 @@
+#!/bin/sh
+# omnidl-cli: a system user and a data folder for the web service. The
+# service itself is not switched on; that is the administrator's call.
+set -e
+
+if [ "$1" = configure ]; then
+    if ! getent passwd omnidl >/dev/null; then
+        useradd --system --user-group --home-dir /var/lib/omnidl --no-create-home \
+            --shell /usr/sbin/nologin --comment "omnidl web interface" omnidl
+    fi
+    for dir in /var/lib/omnidl /var/lib/omnidl/downloads; do
+        if [ ! -d "$dir" ]; then
+            install -d -o omnidl -g omnidl -m 0750 "$dir"
+        fi
+    done
+
+    if [ -d /run/systemd/system ]; then
+        systemctl daemon-reload >/dev/null 2>&1 || true
+        # After an upgrade a running service picks up the new program.
+        systemctl try-restart omnidl-web.service >/dev/null 2>&1 || true
+    fi
+
+    if [ -z "$2" ]; then
+        cat <<'EOF'
+
+omnidl-cli ist installiert.
+  Im Terminal:      omnidl-cli get <Link>
+  Web-Interface:    sudo systemctl enable --now omnidl-web
+                    -> http://<dieser-Rechner>:8080, Downloads in /var/lib/omnidl/downloads
+  Einstellungen:    /etc/default/omnidl-web (Adresse, Ordner, Passwort); ohne Passwort
+                    erzeugt omnidl eines: journalctl -u omnidl-web
+
+EOF
+    fi
+fi
+
+exit 0

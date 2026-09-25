@@ -1,0 +1,12 @@
+# Einstellungen für das omnidl-Web-Interface (Dienst omnidl-web).
+# Nach Änderungen:  sudo systemctl restart omnidl-web
+
+# Adresse und Port. 127.0.0.1:8080 = nur von diesem Rechner aus erreichbar.
+#OMNIDL_WEB_LISTEN=0.0.0.0:8080
+
+# Zielordner der Downloads; der Benutzer "omnidl" muss hineinschreiben dürfen.
+#OMNIDL_WEB_DIR=/var/lib/omnidl/downloads
+
+# Passwort für das Web-Interface. Ohne erzeugt omnidl beim ersten Start eines, speichert
+# es in /var/lib/omnidl/web.toml und zeigt es im Protokoll: journalctl -u omnidl-web
+#OMNIDL_PASSWORD=
