@@ -522,6 +522,10 @@ mod tests {
             eprintln!("regular: Index {} {:?}; semibold: Index {} {:?}", r.index, r.tweak.coords, s.index, s.tweak.coords);
         }
         assert_eq!(font.is_some(), !present.is_empty(), "{present:?}");
+        #[cfg(target_os = "macos")]
+        if let (Some((_, s)), true) = (&font, Path::new("/System/Library/Fonts/SFNS.ttf").is_file()) {
+            assert!(!s.tweak.coords.as_ref().is_empty(), "San Francisco als variable Schrift: {:?}", faces(&s.font));
+        }
         #[cfg(windows)]
         if let (Some((r, s)), Ok(segoe), Ok(semi)) =
             (&font, std::fs::read("C:/Windows/Fonts/segoeui.ttf"), std::fs::read("C:/Windows/Fonts/seguisb.ttf"))
